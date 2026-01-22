@@ -4,5 +4,7 @@ elasticsearch==8.13.0
 pandas
 openpyxl
 google-generativeai
+google-cloud-storage
+google-auth
 # streamlit-aggrid
 # matplotlib

@@ -13,3 +13,5 @@ venv/
 
 #デバッグ用ファイル
 debug.py
+auth.xlsx
+query/
