@@ -43,7 +43,7 @@ def show_search_info(
     or_words: list,
     not_words: list,
     selected_years: list,
-    search_title: bool
+    search_fields: list
 ):
     """
     検索条件を表示
@@ -53,7 +53,7 @@ def show_search_info(
         or_words: OR検索キーワード
         not_words: NOT検索キーワード
         selected_years: 選択年度
-        search_title: 資料名検索フラグ
+        search_fields: 検索対象フィールド
     """
     search_info_parts = []
     if and_words:
@@ -64,8 +64,8 @@ def show_search_info(
         search_info_parts.append(f"**NOT**: {', '.join(not_words)}")
     if selected_years:
         search_info_parts.append(f"**年度**: {', '.join(map(str, sorted(selected_years)))}")
-    if search_title:
-        search_info_parts.append("**検索対象**: 本文 + 資料名")
+    if search_fields:
+        search_info_parts.append(f"**検索対象**: {', '.join(search_fields)}")
     
     if search_info_parts:
         st.info("🔍 **検索条件**: " + " | ".join(search_info_parts))

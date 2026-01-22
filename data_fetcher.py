@@ -3,6 +3,7 @@
 Elasticsearchからのデータ取得と集計処理
 """
 
+import re
 import json
 from typing import Any
 import pandas as pd
@@ -169,18 +170,29 @@ def fetch_search_results(
             catmap["category"] == source.get("category"), "short_name"
         ].values
         
+        # file_idの形式チェック
+        file_id = source.get("file_id", "")
+        if re.match(r'^[A-Z]{2}[0-9]{7}$', file_id):
+            # 旧形式（例：DD0000307）
+            url_gf = f"https://storage.googleapis.com/gf-p/bunsyo/{file_id}.pdf#page={source.get('file_page', '')}"
+        else:
+            # 新形式（例：BDH000122G）
+            url_gf = f"https://www.gfinder.jp/#/source/{file_id}"
+        
         data.append({
             "団体コード": code_str,
             "都道府県": todofuken[0] if len(todofuken) > 0 else "",
             "市区町村": shikuchoson[0] if len(shikuchoson) > 0 else "",
             "資料カテゴリ": category_name[0] if len(category_name) > 0 else "",
+            "ファイルID": file_id,
             "資料名": source.get("title", ""),
-            "URL": source.get("source_url", "") + "#page=" + str(source.get("file_page", "")),
+            "URL(GF)": url_gf,
+            "URL(原本)": source.get("source_url", "") + "#page=" + str(source.get("file_page", "")),
             "ページ": str(source.get("file_page", "")) + "／" + str(source.get("number_of_pages", "")),
             "本文": source.get("content_text", ""),
             "開始年度": source.get("fiscal_year_start", ""),
             "終了年度": source.get("fiscal_year_end", ""),
-        })
+    })
     
     return pd.DataFrame(data)
 

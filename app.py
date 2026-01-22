@@ -55,7 +55,7 @@ query = build_search_query(
     years=sidebar_config["selected_years"],
     codes=sidebar_config["codes_for_query"],
     categories=sidebar_config["sel_categories"],
-    include_title=sidebar_config["search_title"]
+    search_fields=sidebar_config["search_fields"]
 )
 
 # ====== KPI取得 ======
@@ -70,7 +70,7 @@ show_search_info(
     or_words=sidebar_config["or_words"],
     not_words=sidebar_config["not_words"],
     selected_years=sidebar_config["selected_years"],
-    search_title=sidebar_config["search_title"]
+    search_fields=sidebar_config["search_fields"]
 )
 
 # ====== KPI表示 ======

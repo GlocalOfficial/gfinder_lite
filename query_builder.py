@@ -13,7 +13,7 @@ def build_search_query(
     years: List[int],
     codes: List[str],
     categories: List[int],
-    include_title: bool = False
+    search_fields: List[str] = None
 ) -> dict:
     """
     キーワード・年度・自治体・カテゴリを組み合わせたクエリを構築
@@ -25,58 +25,54 @@ def build_search_query(
         years: 検索対象年度リスト
         codes: 自治体コードリスト
         categories: カテゴリIDリスト
-        include_title: 資料名も検索対象に含めるか
+        search_fields: 検索対象フィールドリスト（["本文", "資料名"]）
     
     Returns:
         dict: Elasticsearchクエリ
     """
+    if search_fields is None:
+        search_fields = ["本文"]
+    
+    # フィールド名のマッピング
+    field_mapping = {
+        "本文": "content_text",
+        "資料名": "title"
+    }
+    target_fields = [field_mapping[f] for f in search_fields if f in field_mapping]
+    
+    # 検索対象フィールドがない場合はデフォルトで本文のみ
+    if not target_fields:
+        target_fields = ["content_text"]
+    
     must_clauses = []
     should_clauses = []
     must_not_clauses = []
     filter_clauses = []
     
-    # ===== キーワード検索 =====
+    # ===== キーワード検索用ヘルパー関数 =====
+    def build_field_query(word):
+        """複数フィールドに対するクエリを構築"""
+        if len(target_fields) == 1:
+            return {"match_phrase": {target_fields[0]: word}}
+        else:
+            return {
+                "bool": {
+                    "should": [{"match_phrase": {field: word}} for field in target_fields],
+                    "minimum_should_match": 1
+                }
+            }
+    
+    # ===== AND キーワード =====
     for w in and_words:
-        if include_title:
-            must_clauses.append({
-                "bool": {
-                    "should": [
-                        {"match_phrase": {"content_text": w}},
-                        {"match_phrase": {"title": w}}
-                    ],
-                    "minimum_should_match": 1
-                }
-            })
-        else:
-            must_clauses.append({"match_phrase": {"content_text": w}})
+        must_clauses.append(build_field_query(w))
     
+    # ===== OR キーワード =====
     for w in or_words:
-        if include_title:
-            should_clauses.append({
-                "bool": {
-                    "should": [
-                        {"match_phrase": {"content_text": w}},
-                        {"match_phrase": {"title": w}}
-                    ],
-                    "minimum_should_match": 1
-                }
-            })
-        else:
-            should_clauses.append({"match_phrase": {"content_text": w}})
+        should_clauses.append(build_field_query(w))
     
+    # ===== NOT キーワード =====
     for w in not_words:
-        if include_title:
-            must_not_clauses.append({
-                "bool": {
-                    "should": [
-                        {"match_phrase": {"content_text": w}},
-                        {"match_phrase": {"title": w}}
-                    ],
-                    "minimum_should_match": 1
-                }
-            })
-        else:
-            must_not_clauses.append({"match_phrase": {"content_text": w}})
+        must_not_clauses.append(build_field_query(w))
     
     # ===== 年度検索 =====
     if years:

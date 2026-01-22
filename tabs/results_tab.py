@@ -30,6 +30,21 @@ def render_results_tab(
         if df_results.empty:
             st.warning("該当データがありません。フィルタを見直してください。")
         else:
-            st.dataframe(df_results, use_container_width=True, hide_index=True)
+            st.data_editor(
+                df_results,
+                use_container_width=True,
+                hide_index=True,
+                disabled=True,
+                column_config={
+                    "URL(GF)": st.column_config.LinkColumn(
+                        "URL(GF)",
+                        display_text="📄リンク"
+                    ),
+                    "URL(原本)": st.column_config.LinkColumn(
+                        "URL(原本)",
+                        display_text="🌐リンク"
+                    )
+                }
+            )
     else:
         st.warning("検索条件を設定してください。")
