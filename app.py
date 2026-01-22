@@ -77,9 +77,18 @@ show_search_info(
 show_kpi_metrics(kpi_data)
 
 # ====== タブ表示 ======
-tab_counts, tab_results, tab_latest, tab_summary = st.tabs([
-    "件数", "検索結果", "最新収集月", "🤖 AI要約"
+tab_results, tab_counts, tab_latest, tab_summary = st.tabs([
+    "検索結果", "件数", "最新収集月", "🤖 AI要約"
 ])
+
+with tab_results:
+    render_results_tab(
+        es=es,
+        query=query,
+        jichitai=jichitai,
+        catmap=catmap,
+        result_limit=sidebar_config["result_limit"]
+    )
 
 with tab_counts:
     render_counts_tab(
@@ -91,15 +100,6 @@ with tab_counts:
         display_unit=sidebar_config["display_unit"],
         count_mode=sidebar_config["count_mode"],
         short_unique=sidebar_config["short_unique"]
-    )
-
-with tab_results:
-    render_results_tab(
-        es=es,
-        query=query,
-        jichitai=jichitai,
-        catmap=catmap,
-        result_limit=sidebar_config["result_limit"]
     )
 
 with tab_latest:

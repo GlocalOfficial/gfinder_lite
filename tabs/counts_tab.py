@@ -17,8 +17,6 @@ def render_counts_tab(
     jichitai: pd.DataFrame,
     pref_master: pd.DataFrame,
     catmap: pd.DataFrame,
-    display_unit: str,
-    count_mode: str,
     short_unique: pd.DataFrame
 ):
     """
@@ -30,10 +28,32 @@ def render_counts_tab(
         jichitai: 自治体マスターデータ
         pref_master: 都道府県マスターデータ
         catmap: カテゴリマスターデータ
-        display_unit: 表示単位
-        count_mode: 集計単位
         short_unique: ユニークなshort_nameリスト
     """
+    # 表示設定（タブ内）
+    st.markdown("### ⚙️ 表示設定")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        display_unit = st.radio(
+            "表示単位",
+            ["都道府県", "市区町村"],
+            index=0,
+            horizontal=True
+        )
+    
+    with col2:
+        count_mode = st.radio(
+            "集計単位",
+            ["ファイル数", "ページ数"],
+            index=0,
+            help="ファイル数：PDFファイル単位で集計\nページ数：PDFのページ単位で集計",
+            horizontal=True
+        )
+    
+    st.markdown("---")
+    
+    # データ取得と表示
     group_field = FIELD_CODE if display_unit == "市区町村" else FIELD_AFFILIATION
     df_counts = fetch_counts(
         es,

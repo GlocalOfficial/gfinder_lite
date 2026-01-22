@@ -177,17 +177,6 @@ def build_sidebar(jichitai: pd.DataFrame, catmap: pd.DataFrame) -> dict:
     # ========== 表示設定 ==========
     st.sidebar.markdown("---")
     st.sidebar.header("表示設定")
-    display_unit = st.sidebar.radio(
-        "表示単位",
-        ["都道府県", "市区町村"],
-        index=0
-    )
-    count_mode = st.sidebar.radio(
-        "集計単位",
-        ["ファイル数", "ページ数"],
-        index=0,
-        help="ファイル数：PDFファイル単位で集計\nページ数：PDFのページ単位で集計"
-    )
     result_limit = st.sidebar.radio(
         "検索結果の表示件数",
         options=[100, 1000, 10000],
@@ -235,8 +224,6 @@ def build_sidebar(jichitai: pd.DataFrame, catmap: pd.DataFrame) -> dict:
         "sel_codes": sel_codes,
         "sel_categories": sel_categories,
         "codes_for_query": codes_for_query,
-        "display_unit": display_unit,
-        "count_mode": count_mode,
         "result_limit": result_limit,
         "short_unique": short_unique,
     }

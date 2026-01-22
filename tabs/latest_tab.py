@@ -17,7 +17,6 @@ def render_latest_tab(
     jichitai: pd.DataFrame,
     pref_master: pd.DataFrame,
     catmap: pd.DataFrame,
-    display_unit: str,
     short_unique: pd.DataFrame
 ):
     """
@@ -29,9 +28,21 @@ def render_latest_tab(
         jichitai: 自治体マスターデータ
         pref_master: 都道府県マスターデータ
         catmap: カテゴリマスターデータ
-        display_unit: 表示単位
         short_unique: ユニークなshort_nameリスト
     """
+    # 表示設定（タブ内）
+    st.markdown("### ⚙️ 表示設定")
+    display_unit = st.radio(
+        "表示単位",
+        ["都道府県", "市区町村"],
+        index=0,
+        horizontal=True,
+        key="latest_display_unit"
+    )
+    
+    st.markdown("---")
+    
+    # データ取得と表示
     group_field = FIELD_CODE if display_unit == "市区町村" else FIELD_AFFILIATION
     df_latest = fetch_latest_month(es, _qkey(query), group_field)
     
