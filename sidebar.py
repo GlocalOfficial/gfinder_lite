@@ -200,9 +200,9 @@ def build_sidebar(jichitai: pd.DataFrame, catmap: pd.DataFrame) -> dict:
                 placeholder="自治体名で検索..."
             )
     
-    # デバッグ: 選択された値を表示
-    if selected_values:
-        st.sidebar.write("🔍 デバッグ: 選択された値", selected_values)
+    # # デバッグ: 選択された値を表示
+    # if selected_values:
+    #     st.sidebar.write("🔍 デバッグ: 選択された値", selected_values)
     
     # 選択された値(自治体名)をコードに変換
     sel_codes = []
@@ -246,9 +246,9 @@ def build_sidebar(jichitai: pd.DataFrame, catmap: pd.DataFrame) -> dict:
         # 重複を除去
         sel_codes = list(set(sel_codes))
         
-        # デバッグ: 抽出されたコードを表示
-        if sel_codes:
-            st.sidebar.write(f"🔍 市区町村コード: {len(sel_codes)}件")
+        # # デバッグ: 抽出されたコードを表示
+        # if sel_codes:
+        #     st.sidebar.write(f"🔍 市区町村コード: {len(sel_codes)}件")
     
     # カテゴリ選択
     st.sidebar.markdown("---")
@@ -320,8 +320,8 @@ def build_sidebar(jichitai: pd.DataFrame, catmap: pd.DataFrame) -> dict:
     else:
         codes_for_query = code_pool["code"].tolist()
     
-    # デバッグ: 最終的なクエリ用コード数を表示
-    st.sidebar.write(f"🔍 クエリ対象: {len(codes_for_query)}自治体")
+    # # デバッグ: 最終的なクエリ用コード数を表示
+    # st.sidebar.write(f"🔍 クエリ対象: {len(codes_for_query)}自治体")
     
     return {
         "and_words": and_words,

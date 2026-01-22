@@ -1,9 +1,9 @@
 """
 クエリ構築モジュール
-Elasticsearchクエリの生成ロジック
+Elasticsearchクエリの生成ロジック（ユーザー制限対応）
 """
 
-from typing import List
+from typing import List, Optional
 
 
 def build_search_query(
@@ -13,7 +13,8 @@ def build_search_query(
     years: List[int],
     codes: List[str],
     categories: List[int],
-    search_fields: List[str] = None
+    search_fields: List[str] = None,
+    base_query: Optional[dict] = None
 ) -> dict:
     """
     キーワード・年度・自治体・カテゴリを組み合わせたクエリを構築
@@ -26,6 +27,7 @@ def build_search_query(
         codes: 自治体コードリスト
         categories: カテゴリIDリスト
         search_fields: 検索対象フィールドリスト（["本文", "資料名"]）
+        base_query: ベースクエリ（ユーザー制限用、user_query.pyから渡される）
     
     Returns:
         dict: Elasticsearchクエリ
@@ -49,6 +51,29 @@ def build_search_query(
     must_not_clauses = []
     filter_clauses = []
     
+    # ===== ベースクエリがある場合は、そこから条件を引き継ぐ =====
+    if base_query and isinstance(base_query, dict):
+        bool_base = base_query.get("bool", {})
+        
+        # ベースクエリのmust句を引き継ぐ
+        if "must" in bool_base:
+            must_clauses.extend(bool_base["must"])
+        
+        # ベースクエリのshould句を引き継ぐ
+        if "should" in bool_base:
+            should_clauses.extend(bool_base["should"])
+        
+        # ベースクエリのmust_not句を引き継ぐ
+        if "must_not" in bool_base:
+            must_not_clauses.extend(bool_base["must_not"])
+        
+        # ベースクエリのfilter句を引き継ぐ
+        if "filter" in bool_base:
+            if isinstance(bool_base["filter"], list):
+                filter_clauses.extend(bool_base["filter"])
+            else:
+                filter_clauses.append(bool_base["filter"])
+    
     # ===== キーワード検索用ヘルパー関数 =====
     def build_field_query(word):
         """複数フィールドに対するクエリを構築"""
@@ -62,19 +87,19 @@ def build_search_query(
                 }
             }
     
-    # ===== AND キーワード =====
+    # ===== AND キーワード（追加条件） =====
     for w in and_words:
         must_clauses.append(build_field_query(w))
     
-    # ===== OR キーワード =====
+    # ===== OR キーワード（追加条件） =====
     for w in or_words:
         should_clauses.append(build_field_query(w))
     
-    # ===== NOT キーワード =====
+    # ===== NOT キーワード（追加条件） =====
     for w in not_words:
         must_not_clauses.append(build_field_query(w))
     
-    # ===== 年度検索 =====
+    # ===== 年度検索（追加条件） =====
     if years:
         year_should = []
         for y in years:
@@ -108,23 +133,36 @@ def build_search_query(
             }
         })
     
-    # ===== 自治体コード =====
+    # ===== 自治体コード（追加条件） =====
+    # ベースクエリで既に制限されている可能性があるので、
+    # codesが指定されている場合のみ追加
     if codes:
+        # 既存のcode制限と重複しないように、新しいtermsクエリとして追加
+        # （ベースクエリのcode制限は既にmust_clausesに含まれている）
         filter_clauses.append({"terms": {"code": codes}})
     
-    # ===== カテゴリ =====
+    # ===== カテゴリ（追加条件） =====
+    # 同様に、categoriesが指定されている場合のみ追加
     if categories:
         filter_clauses.append({"terms": {"category": categories}})
     
     # ===== クエリ組み立て =====
     query = {"bool": {}}
+    
     if must_clauses:
         query["bool"]["must"] = must_clauses
+    
     if should_clauses:
         query["bool"]["should"] = should_clauses
-        query["bool"]["minimum_should_match"] = 1
+        # ベースクエリでminimum_should_matchが設定されていた場合は保持
+        if base_query and "bool" in base_query and "minimum_should_match" in base_query["bool"]:
+            query["bool"]["minimum_should_match"] = base_query["bool"]["minimum_should_match"]
+        else:
+            query["bool"]["minimum_should_match"] = 1
+    
     if must_not_clauses:
         query["bool"]["must_not"] = must_not_clauses
+    
     if filter_clauses:
         query["bool"]["filter"] = filter_clauses
     
