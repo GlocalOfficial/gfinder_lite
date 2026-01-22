@@ -52,6 +52,7 @@ G-Finder Liteは、Elasticsearchに格納された自治体の公開文書デー
 - Python 3.8以上
 - Elasticsearch 8.13.0
 - Gemini API（AI要約用）
+- Google Cloud Storage（ユーザー管理機能用、オプション）
 
 ### Pythonパッケージ
 ```
@@ -61,6 +62,8 @@ elasticsearch==8.13.0
 pandas
 openpyxl
 google-generativeai
+google-cloud-storage
+google-auth
 ```
 
 ---
@@ -80,9 +83,11 @@ pip install -r requirements.txt
 
 ### 3. 必須データファイルの準備
 
-以下のファイルをプロジェクトルートに配置してください：
+以下のファイルを準備してください：
 
-#### `jichitai.xlsx`（自治体マスターデータ）
+#### ローカルファイル（プロジェクトルートに配置）
+
+##### `jichitai.xlsx`（自治体マスターデータ）
 全国の自治体情報を管理するExcelファイル。以下の列が必須です：
 
 | 列名 | 型 | 説明 | 例 |
@@ -106,7 +111,7 @@ code    | affiliation_code | pref_name | city_name | city_type
 271004  | 27               | 大阪府    | 大阪市    | 市
 ```
 
-#### `category.xlsx`（カテゴリマスターデータ）
+##### `category.xlsx`（カテゴリマスターデータ）
 資料カテゴリを管理するExcelファイル。以下の列が必須です：
 
 | 列名 | 型 | 説明 | 例 |
@@ -126,15 +131,20 @@ category | category_name      | short_name   | order | group
 3        | 議会議事録         | 議事録       | 3     | 議会議事録
 ```
 
-#### `auth.xlsx`（ユーザー認証・権限管理）**[オプション]**
-ユーザーごとのログイン情報と権限を管理するExcelファイル。以下の列が必須です：
+#### GCSファイル（Google Cloud Storageに配置）**[オプション]**
+
+以下のファイルはGCS（Google Cloud Storage）のバケットに配置します。
+
+##### `auth.xlsx`（ユーザー認証・権限管理）
+
+ユーザーごとのログイン情報と権限を管理するExcelファイル。GCS上の**バケットルート**に保存してください。以下の列が必須です：
 
 | 列名 | 型 | 説明 | 例 |
 |------|-----|------|-----|
 | `username` | 文字列 | ログインID | `user_tokyo` |
 | `password` | 文字列 | パスワード | `pass123` |
 | `display_name` | 文字列 | 表示名 | `東京都ユーザー` |
-| `query_file` | 文字列 | クエリファイル名（queryディレクトリ内） | `user_tokyo.json` |
+| `query_file` | 文字列 | クエリファイル名（`query/`ディレクトリ内） | `user_tokyo.json` |
 | `can_modify_query` | 文字列 | クエリ修正可否（`TRUE`/`FALSE`） | `FALSE` |
 | `enabled` | 文字列 | アカウント有効/無効（`TRUE`/`FALSE`） | `TRUE` |
 
@@ -148,6 +158,11 @@ user_osaka  | osaka789 | 大阪府ユーザー    | user_osaka.json   | TRUE    
 guest       | guest000 | ゲストユーザー    | guest.json        | FALSE            | FALSE
 ```
 
+**GCS保存場所:**
+```
+gs://{your-bucket-name}/auth.xlsx
+```
+
 **列の詳細説明:**
 
 - **username**: ログイン時に使用するユーザーID（一意である必要があります）
@@ -155,7 +170,7 @@ guest       | guest000 | ゲストユーザー    | guest.json        | FALSE   
 - **display_name**: アプリ内で表示されるユーザー名
 - **query_file**: 
   - 空欄: 制限なし（全データアクセス可能）
-  - ファイル名指定: `query/`ディレクトリ内のJSONファイルを参照
+  - ファイル名指定: GCS上の`query/`ディレクトリ内のJSONファイルを参照（例: `user_tokyo.json`）
 - **can_modify_query**:
   - `TRUE`: ベースクエリに追加してキーワード検索等が可能
   - `FALSE`: クエリ固定モード（検索条件変更不可）
@@ -163,14 +178,125 @@ guest       | guest000 | ゲストユーザー    | guest.json        | FALSE   
   - `TRUE`: ログイン可能
   - `FALSE`: アカウント無効（ログイン不可）
 
+##### クエリファイル（`query/*.json`）
 
-### 4. Streamlit Secretsの設定
+ユーザーごとのアクセス制限を定義するJSONファイル。GCS上の**`query/`ディレクトリ**に保存してください。
+
+**GCS保存場所:**
+```
+gs://{your-bucket-name}/query/user_tokyo.json
+gs://{your-bucket-name}/query/user_osaka.json
+gs://{your-bucket-name}/query/guest.json
+```
+
+**例: `query/user_tokyo.json`（東京都のみ閲覧可能）**
+```json
+{
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "terms": {
+            "code": ["131016", "131024", "131032"]
+          }
+        },
+        {
+          "terms": {
+            "category": [1, 2, 3]
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+**注意:**
+- `auth.xlsx`で指定した`query_file`のファイル名と一致させてください
+- JSONファイルはElasticsearchのクエリ形式で記述します
+
+
+### 4. GCS（Google Cloud Storage）の設定
+
+ユーザー認証機能を使用する場合は、GCSの設定が必要です。
+
+#### 4-1. GCSバケットの準備
+
+1. Google Cloud Consoleでバケットを作成
+2. 以下のファイル構造でアップロード：
+   ```
+   {your-bucket-name}/
+   ├── auth.xlsx          # ユーザー認証ファイル
+   └── query/             # クエリディレクトリ
+       ├── user_tokyo.json
+       ├── user_osaka.json
+       └── guest.json
+   ```
+
+#### 4-2. サービスアカウントの作成
+
+1. Google Cloud Consoleで「IAM と管理」→「サービスアカウント」
+2. 新しいサービスアカウントを作成
+3. 権限：「Storage オブジェクト閲覧者」を付与
+4. JSONキーを作成してダウンロード
+
+#### 4-3. Streamlit Secretsへの設定
+
+`.streamlit/secrets.toml`に以下を追加：
+
+```toml
+# GCS認証情報（方法1: JSON全体を設定）
+[gcp_service_account]
+type = "service_account"
+project_id = "your-project-id"
+private_key_id = "your-private-key-id"
+private_key = "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+client_email = "your-service-account@your-project.iam.gserviceaccount.com"
+client_id = "123456789"
+auth_uri = "https://accounts.google.com/o/oauth2/auth"
+token_uri = "https://oauth2.googleapis.com/token"
+auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
+client_x509_cert_url = "https://www.googleapis.com/..."
+
+# または方法2: 個別の値として設定
+# GCS_PROJECT_ID = "your-project-id"
+# GCS_PRIVATE_KEY_ID = "your-private-key-id"
+# GCS_PRIVATE_KEY = "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+# GCS_CLIENT_EMAIL = "your-service-account@your-project.iam.gserviceaccount.com"
+# GCS_CLIENT_ID = "123456789"
+
+# GCSバケット名
+GCS_BUCKET_NAME = "your-bucket-name"
+```
+
+**注意:**
+- `private_key`の改行は`\n`で表現してください
+- Streamlit Cloudにデプロイする場合は、Webコンソールから同じ内容を設定してください
+
+
+### 5. Streamlit Secretsの設定（全体）
 
 `.streamlit/secrets.toml` ファイルを作成し、以下の情報を設定：
 
 ```toml
-# パスワード認証（オプション）
+# パスワード認証（オプション: auth.xlsxが無い場合の簡易認証）
 APP_PASSWORD = "your-password"
+
+# GCS認証情報（方法1推奨: JSON全体）
+[gcp_service_account]
+type = "service_account"
+project_id = "your-project-id"
+private_key_id = "your-private-key-id"
+private_key = "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+client_email = "your-service-account@your-project.iam.gserviceaccount.com"
+client_id = "123456789"
+auth_uri = "https://accounts.google.com/o/oauth2/auth"
+token_uri = "https://oauth2.googleapis.com/token"
+auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
+client_x509_cert_url = "https://www.googleapis.com/..."
+
+# GCSバケット名
+GCS_BUCKET_NAME = "your-bucket-name"
 
 # Elasticsearch接続情報
 ES_HOST = "https://your-elasticsearch-host:9200"
@@ -187,7 +313,13 @@ ES_INDEX_kouhou = "index-kouhou"
 GEMINI_API_KEY = "your-gemini-api-key"
 ```
 
-### 5. アプリケーションの起動
+**認証モードについて:**
+- **GCS + auth.xlsx**: GCS上に`auth.xlsx`がある場合、ユーザー管理モードで起動
+- **APP_PASSWORD**: `auth.xlsx`が無い場合、簡易パスワード認証で起動
+- **認証なし**: `APP_PASSWORD`も未設定の場合、認証なしで起動（開発用）
+
+
+### 6. アプリケーションの起動
 streamlitからgithubと連携してアプリを作成しデプロイしてください。
 
 ## 使い方
@@ -216,13 +348,23 @@ streamlitからgithubと連携してアプリを作成しデプロイしてく�
 
 ---
 
-## ユーザー制限機能
+## ユーザー制限機能（GCS版）
 
 特定のユーザーに対して、閲覧可能な自治体やカテゴリを制限できます。
 
-### クエリファイルの作成
+### クエリファイルの管理
 
-`query/` ディレクトリにユーザー別のJSONファイルを作成：
+#### GCS上での配置
+```
+gs://{your-bucket-name}/
+├── auth.xlsx                 # ユーザー認証ファイル
+└── query/                    # クエリディレクトリ
+    ├── user_tokyo.json       # 東京都専用クエリ
+    ├── user_osaka.json       # 大阪府専用クエリ
+    └── guest.json            # ゲスト用クエリ
+```
+
+#### クエリファイルの作成
 
 **例: `query/user_tokyo.json`（東京都のみ閲覧可能）**
 ```json
@@ -246,16 +388,61 @@ streamlitからgithubと連携してアプリを作成しデプロイしてく�
 }
 ```
 
-### セッション状態の設定
+#### ファイルのアップロード方法
 
-ユーザー情報をセッション状態で管理：
+**方法1: Google Cloud Consoleから**
+1. Google Cloud Console → Storage → バケットを選択
+2. `query/`フォルダを作成（なければ）
+3. JSONファイルをアップロード
+
+**方法2: gsutilコマンド**
+```bash
+# ローカルで作成したファイルをアップロード
+gsutil cp user_tokyo.json gs://{your-bucket-name}/query/
+
+# 複数ファイルを一括アップロード
+gsutil cp query/*.json gs://{your-bucket-name}/query/
+```
+
+**方法3: Pythonスクリプト（gcs_loader.pyの関数を利用）**
+```python
+from gcs_loader import upload_query_to_gcs
+
+query_data = {
+    "query": {
+        "bool": {
+            "must": [{"terms": {"code": ["131016"]}}]
+        }
+    }
+}
+
+upload_query_to_gcs("user_tokyo.json", query_data)
+```
+
+### auth.xlsxでの設定
+
+`auth.xlsx`の`query_file`列に、GCS上のファイル名を指定：
+
+```
+username    | query_file
+------------|-------------------
+user_tokyo  | user_tokyo.json
+user_osaka  | user_osaka.json
+guest       | guest.json
+```
+
+### セッション状態の動作
+
+ログイン後、以下の情報が自動的にセッション状態に設定されます：
 
 ```python
-# app.pyまたは認証後に設定
-st.session_state["user_query_file"] = "user_tokyo.json"
-st.session_state["user_can_modify_query"] = False  # True=追加条件入力可, False=固定
-st.session_state["user_display_name"] = "東京都ユーザー"
+# 自動設定される（コード記述不要）
+st.session_state["user_query_file"] = "user_tokyo.json"  # auth.xlsxから
+st.session_state["user_can_modify_query"] = False        # auth.xlsxから
+st.session_state["user_display_name"] = "東京都ユーザー"  # auth.xlsxから
 ```
+
+これらの値は`auth.py`により自動的に設定されるため、手動での設定は不要です。
 
 ### 制限モード
 
@@ -271,7 +458,7 @@ st.session_state["user_display_name"] = "東京都ユーザー"
 ```
 g-finder-lite/
 ├── app.py                    # メインアプリケーション
-├── auth.py                   # パスワード認証
+├── auth.py                   # パスワード認証（GCS対応）
 ├── config.py                 # 設定・定数管理
 ├── data_loader.py            # マスターデータ読み込み
 ├── data_fetcher.py           # Elasticsearchデータ取得
@@ -280,7 +467,8 @@ g-finder-lite/
 ├── table_builder.py          # テーブル整形
 ├── ui_components.py          # UI部品
 ├── sidebar.py                # サイドバー構築
-├── user_query.py             # ユーザー制限管理
+├── user_query.py             # ユーザー制限管理（GCS対応）
+├── gcs_loader.py             # GCSファイル読み込み（NEW）
 ├── gemini_helper.py          # Gemini API連携
 ├── prompt.py                 # AIプロンプト設定
 ├── tabs/                     # タブ表示モジュール
@@ -289,7 +477,7 @@ g-finder-lite/
 │   ├── counts_tab.py
 │   ├── latest_tab.py
 │   └── summary_tab.py
-├── query/                    # ユーザークエリファイル格納
+├── query/                    # ※ローカル開発用（本番はGCS）
 │   └── (user_*.json)
 ├── .streamlit/
 │   └── secrets.toml          # 機密情報（Git管理外）
@@ -299,9 +487,60 @@ g-finder-lite/
 └── README.md                 # このファイル
 ```
 
+**GCS上のファイル構造:**
+```
+gs://{your-bucket-name}/
+├── auth.xlsx                 # ユーザー認証ファイル
+└── query/                    # クエリディレクトリ
+    ├── user_tokyo.json
+    ├── user_osaka.json
+    └── guest.json
+```
+
 ---
 
 ## トラブルシューティング
+
+### ❌ `auth.xlsx がGCSに存在しません`
+
+**原因**: GCSバケットに`auth.xlsx`が配置されていない、またはGCS認証情報が不正
+
+**解決策**:
+```bash
+# ファイルの存在確認
+gsutil ls gs://{your-bucket-name}/auth.xlsx
+
+# ファイルをアップロード
+gsutil cp auth.xlsx gs://{your-bucket-name}/
+
+# 認証情報を確認
+# .streamlit/secrets.toml のGCS設定を確認
+```
+
+### ❌ `クエリファイルがGCSに存在しません`
+
+**原因**: 指定されたクエリファイルがGCS上に存在しない
+
+**解決策**:
+```bash
+# queryディレクトリの確認
+gsutil ls gs://{your-bucket-name}/query/
+
+# クエリファイルをアップロード
+gsutil cp user_tokyo.json gs://{your-bucket-name}/query/
+
+# auth.xlsxのquery_file列の値を確認
+```
+
+### ❌ `GCSクライアント初期化エラー`
+
+**原因**: GCS認証情報が不正または不足
+
+**解決策**:
+1. `.streamlit/secrets.toml`のGCS設定を確認
+2. サービスアカウントのJSONキーが正しいか確認
+3. `GCS_BUCKET_NAME`が設定されているか確認
+4. サービスアカウントに適切な権限があるか確認（Storage オブジェクト閲覧者）
 
 ### ❌ `jichitai.xlsx が見つかりません`
 
