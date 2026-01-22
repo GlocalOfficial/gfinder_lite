@@ -79,7 +79,7 @@ show_kpi_metrics(kpi_data)
 
 # ====== タブ表示 ======
 tab_results, tab_counts, tab_latest, tab_summary = st.tabs([
-    "検索結果", "件数", "最新収集月", "🤖 AI要約"
+    "検索結果", "件数", "最新収集月", "🤖 AI要約(準備中)"
 ])
 
 with tab_results:

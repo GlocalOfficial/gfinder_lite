@@ -99,11 +99,11 @@ def build_sidebar(jichitai: pd.DataFrame, catmap: pd.DataFrame) -> dict:
     user_name = st.session_state.get("user_display_name", "ゲスト")
     st.sidebar.markdown(f"**👤 {user_name}**")
     
-    if restrictions["has_query_file"]:
-        if restrictions["can_modify_query"]:
-            st.sidebar.caption("🔓 デフォルトクエリあり・追加条件入力可")
-        else:
-            st.sidebar.caption("🔒 固定クエリモード")
+    # if restrictions["has_query_file"]:
+    #     if restrictions["can_modify_query"]:
+    #         st.sidebar.caption("🔓 デフォルトクエリあり・追加条件入力可")
+    #     else:
+    #         st.sidebar.caption("🔒 固定クエリモード")
     
     st.sidebar.markdown("---")
     
