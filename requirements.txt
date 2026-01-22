@@ -1,7 +1,7 @@
 streamlit
 elasticsearch==8.13.0
 pandas
-matplotlib
-streamlit-aggrid
 openpyxl
 google-generativeai
+# streamlit-aggrid
+# matplotlib
