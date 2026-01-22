@@ -39,7 +39,8 @@ def render_counts_tab(
             "表示単位",
             ["都道府県", "市区町村"],
             index=0,
-            horizontal=True
+            horizontal=True,
+            key="counts_display_unit"
         )
     
     with col2:
@@ -48,7 +49,8 @@ def render_counts_tab(
             ["ファイル数", "ページ数"],
             index=0,
             help="ファイル数：PDFファイル単位で集計\nページ数：PDFのページ単位で集計",
-            horizontal=True
+            horizontal=True,
+            key="counts_count_mode"
         )
     
     st.markdown("---")

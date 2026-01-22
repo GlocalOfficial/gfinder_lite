@@ -8,7 +8,7 @@ import streamlit as st
 # 認証
 from auth import check_password
 
-# ページ設定（認証前に実行）
+# ページ設定(認証前に実行)
 st.set_page_config(page_title="G-Finder データ収録状況", layout="wide")
 st.markdown("""
 <style>
@@ -55,7 +55,8 @@ query = build_search_query(
     years=sidebar_config["selected_years"],
     codes=sidebar_config["codes_for_query"],
     categories=sidebar_config["sel_categories"],
-    search_fields=sidebar_config["search_fields"]
+    search_fields=sidebar_config["search_fields"],
+    base_query=sidebar_config["restrictions"]["base_query"]  # ユーザーのベースクエリを渡す
 )
 
 # ====== KPI取得 ======
@@ -97,8 +98,6 @@ with tab_counts:
         jichitai=jichitai,
         pref_master=pref_master,
         catmap=catmap,
-        display_unit=sidebar_config["display_unit"],
-        count_mode=sidebar_config["count_mode"],
         short_unique=sidebar_config["short_unique"]
     )
 
@@ -109,7 +108,6 @@ with tab_latest:
         jichitai=jichitai,
         pref_master=pref_master,
         catmap=catmap,
-        display_unit=sidebar_config["display_unit"],
         short_unique=sidebar_config["short_unique"]
     )
 
