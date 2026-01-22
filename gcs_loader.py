@@ -103,10 +103,23 @@ def load_auth_from_gcs() -> Optional[pd.DataFrame]:
             st.error(f"auth.xlsx に必須列が不足: {missing_cols}")
             return None
         
-        # データ型の変換
-        df["can_modify_query"] = df["can_modify_query"].astype(str).str.upper() == "TRUE"
-        df["enabled"] = df["enabled"].astype(str).str.upper() == "TRUE"
-        df["query_file"] = df["query_file"].fillna("")
+        # データ型の変換（空欄を適切に処理）
+        # can_modify_queryの処理（空欄の場合はNoneのまま保持）
+        def parse_bool(val):
+            """ブール値を安全にパース（空欄はNoneのまま返す）"""
+            if pd.isna(val) or val == '' or str(val).strip() == '':
+                return None
+            return str(val).upper() in ['TRUE', '1', 'YES']
+        
+        df["can_modify_query"] = df["can_modify_query"].apply(parse_bool)
+        
+        # enabledの処理（デフォルトはTrue）
+        df["enabled"] = df["enabled"].apply(lambda x: parse_bool(x) if parse_bool(x) is not None else True)
+        
+        # query_fileの処理（空欄はNoneに変換）
+        df["query_file"] = df["query_file"].apply(
+            lambda x: str(x).strip() if pd.notna(x) and str(x).strip() and str(x).lower() != 'nan' else None
+        )
         
         return df
     

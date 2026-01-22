@@ -76,8 +76,20 @@ def _auth_with_user_db(auth_df) -> bool:
                 
                 st.session_state["_authed"] = True
                 st.session_state["user_display_name"] = user_info["display_name"]
-                st.session_state["user_query_file"] = user_info["query_file"] if user_info["query_file"] else None
-                st.session_state["user_can_modify_query"] = user_info["can_modify_query"]
+                
+                # query_fileが空欄（NaN, None, 空文字列）の場合はNoneを設定
+                query_file_value = user_info["query_file"]
+                if query_file_value and str(query_file_value).strip() and str(query_file_value).lower() != 'nan':
+                    st.session_state["user_query_file"] = str(query_file_value).strip()
+                else:
+                    st.session_state["user_query_file"] = None
+                
+                # can_modify_queryが空欄の場合はTrueとして扱う（デフォルト：制限なし）
+                can_modify_value = user_info["can_modify_query"]
+                if can_modify_value is None or str(can_modify_value).strip() == '' or str(can_modify_value).lower() == 'nan':
+                    st.session_state["user_can_modify_query"] = True
+                else:
+                    st.session_state["user_can_modify_query"] = bool(can_modify_value)
                 
                 st.success(f"ようこそ、{user_info['display_name']}さん")
                 st.rerun()
