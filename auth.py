@@ -4,7 +4,7 @@
 """
 
 import streamlit as st
-from config import APP_PASSWORD
+from config import get_secret
 
 
 def check_password() -> bool:
@@ -17,7 +17,7 @@ def check_password() -> bool:
     Returns:
         bool: 認証成功ならTrue、失敗ならFalse
     """
-    required_pw = APP_PASSWORD
+    required_pw = get_secret("APP_PASSWORD")
     if not required_pw:  # パスワード未設定なら認証OFF（開発用）
         return True
 
@@ -31,8 +31,7 @@ def check_password() -> bool:
         pw = st.text_input(
             "Password",
             type="password",
-            placeholder="Enter password",
-            help="運用担当から共有されたパスワードを入力"
+            placeholder="Enter password"
         )
         col_a, col_b = st.columns([1, 5])
         with col_a:

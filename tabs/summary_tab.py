@@ -6,7 +6,7 @@ import datetime
 import streamlit as st
 import pandas as pd
 from elasticsearch import Elasticsearch
-from config import GEMINI_API_KEY
+from config import get_secret
 from data_fetcher import fetch_search_results
 from gemini_helper import get_gemini_model, generate_summary
 from prompt import get_summary_prompt, get_custom_prompt
@@ -32,7 +32,8 @@ def render_summary_tab(
     st.subheader("🤖 Gemini AIによる要約")
     
     # APIキーの確認
-    if not GEMINI_API_KEY:
+    gemini_api_key = get_secret("GEMINI_API_KEY")
+    if not gemini_api_key:
         st.error("Gemini APIキーが設定されていません。Streamlit Secretsに `GEMINI_API_KEY` を追加してください。")
         return
     
@@ -70,7 +71,7 @@ def render_summary_tab(
         with st.spinner("AIが要約を生成中..."):
             try:
                 # Geminiモデルを取得
-                model = get_gemini_model(GEMINI_API_KEY)
+                model = get_gemini_model(gemini_api_key)
                 
                 # DataFrameを辞書のリストに変換
                 documents = df_results.to_dict('records')

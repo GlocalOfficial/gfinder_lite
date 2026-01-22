@@ -7,3 +7,6 @@ venv/
 # 環境
 .env
 *.json
+
+# Streamlit Secrets (重要: 機密情報を含むためコミットしない)
+.streamlit/secrets.toml

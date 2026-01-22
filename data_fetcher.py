@@ -8,7 +8,7 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 from elasticsearch import Elasticsearch
-from config import INDEXES, FIELD_FILE_ID, FIELD_COLLECTED_AT
+from config import FIELD_FILE_ID, FIELD_COLLECTED_AT, get_indexes
 
 
 def _qkey(obj: Any) -> str:
@@ -18,7 +18,7 @@ def _qkey(obj: Any) -> str:
 
 @st.cache_data(show_spinner=False, ttl=300)
 def fetch_counts(
-    es: Elasticsearch,
+    _es: Elasticsearch,
     query_key: str,
     group_field: str,
     include_file: bool
@@ -27,7 +27,7 @@ def fetch_counts(
     グループ×カテゴリごとの件数を取得
     
     Args:
-        es: Elasticsearchクライアント
+        _es: Elasticsearchクライアント（アンダースコアでキャッシュ対象外）
         query_key: クエリのJSON文字列
         group_field: グループ化するフィールド名
         include_file: ファイル数をカウントするか
@@ -35,6 +35,7 @@ def fetch_counts(
     Returns:
         pd.DataFrame: 集計結果（g, category, page_docs, file_docs）
     """
+    indexes = get_indexes()
     after, recs = None, []
     while True:
         body = {
@@ -57,7 +58,7 @@ def fetch_counts(
                 }
             },
         }
-        res = es.search(index=INDEXES, body=body)
+        res = _es.search(index=indexes, body=body)
         for b in res["aggregations"]["by_pair"]["buckets"]:
             recs.append({
                 "g": str(b["key"]["g"]),
@@ -73,7 +74,7 @@ def fetch_counts(
 
 @st.cache_data(show_spinner=False, ttl=300)
 def fetch_latest_month(
-    es: Elasticsearch,
+    _es: Elasticsearch,
     query_key: str,
     group_field: str
 ) -> pd.DataFrame:
@@ -81,13 +82,14 @@ def fetch_latest_month(
     グループ×カテゴリごとの最新収集月（epoch millis）を取得
     
     Args:
-        es: Elasticsearchクライアント
+        _es: Elasticsearchクライアント（アンダースコアでキャッシュ対象外）
         query_key: クエリのJSON文字列
         group_field: グループ化するフィールド名
     
     Returns:
         pd.DataFrame: 最新収集月データ（g, category, latest_epoch）
     """
+    indexes = get_indexes()
     after, recs = None, []
     while True:
         body = {
@@ -107,7 +109,7 @@ def fetch_latest_month(
                 }
             },
         }
-        res = es.search(index=INDEXES, body=body)
+        res = _es.search(index=indexes, body=body)
         for b in res["aggregations"]["by_pair"]["buckets"]:
             recs.append({
                 "g": str(b["key"]["g"]),
@@ -121,7 +123,7 @@ def fetch_latest_month(
 
 
 def fetch_search_results(
-    es: Elasticsearch,
+    _es: Elasticsearch,
     query: dict,
     jichitai: pd.DataFrame,
     catmap: pd.DataFrame,
@@ -131,7 +133,7 @@ def fetch_search_results(
     検索結果を取得してDataFrame形式で返す
     
     Args:
-        es: Elasticsearchクライアント
+        _es: Elasticsearchクライアント（アンダースコアでキャッシュ対象外）
         query: 検索クエリ
         jichitai: 自治体マスターデータ
         catmap: カテゴリマスターデータ
@@ -140,11 +142,12 @@ def fetch_search_results(
     Returns:
         pd.DataFrame: 検索結果
     """
+    indexes = get_indexes()
     body = {
         "size": result_limit,
         "query": query,
     }
-    res = es.search(index=INDEXES, body=body)
+    res = _es.search(index=indexes, body=body)
     hits = res.get("hits", {}).get("hits", [])
     
     # 必要な情報を抽出
@@ -182,17 +185,18 @@ def fetch_search_results(
     return pd.DataFrame(data)
 
 
-def fetch_kpi(es: Elasticsearch, query: dict) -> dict:
+def fetch_kpi(_es: Elasticsearch, query: dict) -> dict:
     """
     KPI（全体統計）を取得
     
     Args:
-        es: Elasticsearchクライアント
+        _es: Elasticsearchクライアント（アンダースコアでキャッシュ対象外）
         query: 検索クエリ
     
     Returns:
         dict: KPIデータ（total_pages, total_files, max_collected_value）
     """
+    indexes = get_indexes()
     kpi_body = {
         "size": 0,
         "track_total_hits": True,
@@ -202,7 +206,7 @@ def fetch_kpi(es: Elasticsearch, query: dict) -> dict:
             "max_collected": {"max": {"field": FIELD_COLLECTED_AT}},
         },
     }
-    kpi_res = es.search(index=INDEXES, body=kpi_body)
+    kpi_res = _es.search(index=indexes, body=kpi_body)
     
     return {
         "total_pages": kpi_res.get("hits", {}).get("total", {}).get("value", 0),

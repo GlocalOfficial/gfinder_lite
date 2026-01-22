@@ -32,29 +32,17 @@ def get_secret(key: str, default: str = "") -> str:
         return default
 
 
-# ====== Elasticsearch接続情報 ======
-ES_HOST = get_secret("ES_HOST")
-ES_USERNAME = get_secret("ES_USERNAME")
-ES_PASSWORD = get_secret("ES_PASSWORD")
-ES_INDEX_yosankessan = get_secret("ES_INDEX_yosankessan")
-ES_INDEX_keikakuhoshin = get_secret("ES_INDEX_keikakuhoshin")
-ES_INDEX_iinkaigijiroku = get_secret("ES_INDEX_iinkaigijiroku")
-ES_INDEX_kouhou = get_secret("ES_INDEX_kouhou")
-
-# インデックスリスト（空でないものだけ）
-INDEXES = [
-    i for i in [
-        ES_INDEX_yosankessan,
-        ES_INDEX_keikakuhoshin,
-        ES_INDEX_iinkaigijiroku,
-        ES_INDEX_kouhou
-    ] if i
-]
-
-
-# ====== Gemini API設定 ======
-GEMINI_API_KEY = get_secret("GEMINI_API_KEY")
-
-
-# ====== アプリケーション設定 ======
-APP_PASSWORD = get_secret("APP_PASSWORD")
+def get_indexes() -> list:
+    """
+    Elasticsearchインデックスのリストを取得
+    
+    Returns:
+        list: インデックス名のリスト（空でないものだけ）
+    """
+    indexes = [
+        get_secret("ES_INDEX_yosankessan"),
+        get_secret("ES_INDEX_keikakuhoshin"),
+        get_secret("ES_INDEX_iinkaigijiroku"),
+        get_secret("ES_INDEX_kouhou")
+    ]
+    return [i for i in indexes if i]
