@@ -8,7 +8,7 @@ import pandas as pd
 from elasticsearch import Elasticsearch
 from config import get_secret
 from data_fetcher import fetch_search_results
-from gemini_helper import get_gemini_model, generate_summary
+from openai_helper import get_openai_client, generate_summary
 from prompt import get_summary_prompt, get_custom_prompt
 
 
@@ -29,12 +29,12 @@ def render_summary_tab(
         catmap: カテゴリマスターデータ
         result_limit: 表示件数上限
     """
-    st.subheader("🤖 Gemini AIによる要約")
+    st.subheader("🤖 GPT による要約")
     
     # APIキーの確認
-    gemini_api_key = get_secret("GEMINI_API_KEY")
-    if not gemini_api_key:
-        st.error("Gemini APIキーが設定されていません。Streamlit Secretsに `GEMINI_API_KEY` を追加してください。")
+    openai_api_key = get_secret("OPENAI_API_KEY")
+    if not openai_api_key:
+        st.error("OpenAI APIキーが設定されていません。Streamlit Secretsに `OPENAI_API_KEY` を追加してください。")
         return
     
     # 検索結果の確認
@@ -49,6 +49,22 @@ def render_summary_tab(
         return
     
     st.info(f"📊 検索結果: {len(df_results)}件のドキュメント")
+    
+    # モデル選択
+    model_options = {
+        "GPT-4o": "gpt-4o",
+        "GPT-4o mini": "gpt-4o-mini",
+        "GPT-4 Turbo": "gpt-4-turbo-preview",
+        "GPT-3.5 Turbo": "gpt-3.5-turbo"
+    }
+    
+    selected_model_name = st.selectbox(
+        "使用するモデル",
+        options=list(model_options.keys()),
+        index=0,
+        help="GPT-4oが最新で高性能です。コストを抑えたい場合はGPT-4o miniまたはGPT-3.5 Turboを選択してください。"
+    )
+    selected_model = model_options[selected_model_name]
     
     # 要約モード選択
     summary_mode = st.radio(
@@ -70,8 +86,8 @@ def render_summary_tab(
     if st.button("🚀 要約を実行", type="primary"):
         with st.spinner("AIが要約を生成中..."):
             try:
-                # Geminiモデルを取得
-                model = get_gemini_model(gemini_api_key)
+                # OpenAIクライアントを取得
+                client = get_openai_client(openai_api_key)
                 
                 # DataFrameを辞書のリストに変換
                 documents = df_results.to_dict('records')
@@ -86,7 +102,7 @@ def render_summary_tab(
                     prompt = get_custom_prompt(documents, custom_instruction)
                 
                 # 要約生成
-                summary = generate_summary(model, prompt)
+                summary = generate_summary(client, prompt, model=selected_model)
                 
                 if summary:
                     st.success("✅ 要約が完成しました")
@@ -114,5 +130,10 @@ def render_summary_tab(
         - AIによる要約は参考情報です。重要な決定には必ず原文を確認してください
         - 検索結果が多い場合、処理に時間がかかることがあります
         - 本文は最大2000文字まで使用されます
-        - Gemini APIの利用制限に応じて、一度に処理できる件数に制限があります
+        - OpenAI APIの利用制限に応じて、一度に処理できる件数に制限があります
+        - モデルによってコストが異なります：
+          - **GPT-4o**: 最新で高性能（やや高コスト）
+          - **GPT-4o mini**: GPT-4oの軽量版（バランス型）
+          - **GPT-4 Turbo**: 高性能（高コスト）
+          - **GPT-3.5 Turbo**: 高速で低コスト
         """)

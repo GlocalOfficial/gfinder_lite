@@ -13,3 +13,4 @@ debug.py
 auth.xlsx
 query/
 .streamlit/secrets.toml
+old/

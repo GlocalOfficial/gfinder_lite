@@ -3,7 +3,7 @@ st-ant-tree
 elasticsearch==8.13.0
 pandas
 openpyxl
-google-generativeai
+openai
 google-cloud-storage
 google-auth
 # streamlit-aggrid
