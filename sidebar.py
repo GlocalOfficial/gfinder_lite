@@ -1,6 +1,6 @@
 """
 サイドバーモジュール
-検索条件と表示設定のUI構築（ユーザー制限対応）
+検索条件と表示設定のUI構築（ユーザー制限対応・全ユーザーキーワード検索可能版）
 """
 
 import streamlit as st
@@ -99,59 +99,51 @@ def build_sidebar(jichitai: pd.DataFrame, catmap: pd.DataFrame) -> dict:
     user_name = st.session_state.get("user_display_name", "ゲスト")
     st.sidebar.markdown(f"**👤 {user_name}**")
     
-    # if restrictions["has_query_file"]:
-    #     if restrictions["can_modify_query"]:
-    #         st.sidebar.caption("🔓 デフォルトクエリあり・追加条件入力可")
-    #     else:
-    #         st.sidebar.caption("🔒 固定クエリモード")
-    
     st.sidebar.markdown("---")
     
     # ========== キーワード・年度検索 ===========
-    # can_modify_query=Falseの場合は非表示
-    if restrictions["can_modify_query"]:
-        st.sidebar.subheader("🔍 キーワード・年度絞り込み")
-        
-        year_options = list(range(2010, 2031))
-        selected_years = st.sidebar.multiselect(
-            "年度(複数選択可)",
-            options=year_options,
-            default=[],
-            help="fiscal_year_start/fiscal_year_endで絞り込み"
-        )
-        
-        and_input = st.sidebar.text_input(
-            "AND条件(スペース区切り)",
-            placeholder="例: 環境 計画",
-            help="全てのキーワードを含む文書を検索"
-        )
-        or_input = st.sidebar.text_input(
-            "OR条件(スペース区切り)",
-            placeholder="例: 温暖化 気候変動",
-            help="いずれかのキーワードを含む文書を検索"
-        )
-        not_input = st.sidebar.text_input(
-            "NOT条件(スペース区切り)",
-            placeholder="例: 廃止 中止",
-            help="これらのキーワードを含まない文書を検索"
-        )
-        
-        search_fields = st.sidebar.multiselect(
-            "検索対象フィールド",
-            options=["本文", "資料名"],
-            default=["本文"],
-            help="キーワード検索の対象とするフィールドを選択"
-        )
-        
-        st.sidebar.markdown("---")
-    else:
-        # 固定クエリモードの場合
-        st.sidebar.info("🔒 検索条件は管理者により固定されています")
-        selected_years = []
-        and_input = ""
-        or_input = ""
-        not_input = ""
-        search_fields = ["本文"]
+    st.sidebar.subheader("🔍 キーワード・年度絞り込み")
+    
+    # ベースクエリとの関係を説明
+    if restrictions["has_query_file"]:
+        if restrictions["can_modify_query"]:
+            st.sidebar.caption("ℹ️ 自由に検索条件を設定できます（デフォルトクエリは無視）")
+        else:
+            st.sidebar.caption("ℹ️ デフォルトクエリのキーワードと組み合わせて検索")
+    
+    year_options = list(range(2010, 2031))
+    selected_years = st.sidebar.multiselect(
+        "年度(複数選択可)",
+        options=year_options,
+        default=[],
+        help="fiscal_year_start/fiscal_year_endで絞り込み"
+    )
+    
+    and_input = st.sidebar.text_input(
+        "AND条件(スペース区切り)",
+        placeholder="例: 環境 計画",
+        help="全てのキーワードを含む文書を検索" + 
+             ("（デフォルトクエリのキーワードと組み合わせ）" if restrictions["has_query_file"] and not restrictions["can_modify_query"] else "")
+    )
+    or_input = st.sidebar.text_input(
+        "OR条件(スペース区切り)",
+        placeholder="例: 温暖化 気候変動",
+        help="いずれかのキーワードを含む文書を検索"
+    )
+    not_input = st.sidebar.text_input(
+        "NOT条件(スペース区切り)",
+        placeholder="例: 廃止 中止",
+        help="これらのキーワードを含まない文書を検索"
+    )
+    
+    search_fields = st.sidebar.multiselect(
+        "検索対象フィールド",
+        options=["本文", "資料名"],
+        default=["本文"],
+        help="キーワード検索の対象とするフィールドを選択"
+    )
+    
+    st.sidebar.markdown("---")
     
     # ========== 自治体絞り込み(ツリー形式) ==========
     st.sidebar.subheader("🔍 自治体・カテゴリ絞り込み")
@@ -169,15 +161,12 @@ def build_sidebar(jichitai: pd.DataFrame, catmap: pd.DataFrame) -> dict:
     # 自治体区分での事前フィルタリング
     ctype_opts = sorted(jichitai_filtered["city_type"].dropna().unique().tolist())
     
-    # can_modify_query=Falseかつ制限ありの場合、自治体区分選択を非表示
-    if not restrictions["can_modify_query"] and allowed_codes:
-        sel_city_types = ctype_opts  # 全て選択状態
-    else:
-        sel_city_types = st.sidebar.multiselect(
-            "自治体区分",
-            options=ctype_opts,
-            help="自治体区分で絞り込み後、ツリーから選択してください"
-        )
+    # 自治体区分の選択UI（常に表示）
+    sel_city_types = st.sidebar.multiselect(
+        "自治体区分",
+        options=ctype_opts,
+        help="自治体区分で絞り込み後、ツリーから選択してください"
+    )
     
     # ツリーデータの構築（フィルタ済みjichitaiを使用）
     tree_data, value_to_code = build_jichitai_tree(jichitai_filtered, sel_city_types)
@@ -200,12 +189,13 @@ def build_sidebar(jichitai: pd.DataFrame, catmap: pd.DataFrame) -> dict:
                 placeholder="自治体名で検索..."
             )
     
-    # # デバッグ: 選択された値を表示
-    # if selected_values:
-    #     st.sidebar.write("🔍 デバッグ: 選択された値", selected_values)
-    
     # 選択された値(自治体名)をコードに変換
     sel_codes = []
+    
+    # キーワード処理用にcode_poolを先に定義
+    code_pool = jichitai_filtered.copy()
+    if sel_city_types:
+        code_pool = code_pool[code_pool["city_type"].isin(sel_city_types)]
     
     # selected_valuesが配列の場合（直接値のリスト）
     if selected_values and isinstance(selected_values, list):
@@ -245,10 +235,6 @@ def build_sidebar(jichitai: pd.DataFrame, catmap: pd.DataFrame) -> dict:
         
         # 重複を除去
         sel_codes = list(set(sel_codes))
-        
-        # # デバッグ: 抽出されたコードを表示
-        # if sel_codes:
-        #     st.sidebar.write(f"🔍 市区町村コード: {len(sel_codes)}件")
     
     # カテゴリ選択
     st.sidebar.markdown("---")
@@ -264,22 +250,12 @@ def build_sidebar(jichitai: pd.DataFrame, catmap: pd.DataFrame) -> dict:
         default_categories = short_unique_filtered["short_name"].tolist()
         st.sidebar.caption(f"🔒 選択可能: {len(allowed_categories)}カテゴリ")
         
-        # can_modify_query=Falseの場合は変更不可
-        if not restrictions["can_modify_query"]:
-            sel_cat_short = default_categories
-            st.sidebar.multiselect(
-                "資料カテゴリ",
-                options=default_categories,
-                default=default_categories,
-                disabled=True,
-                help="カテゴリは固定されています"
-            )
-        else:
-            sel_cat_short = st.sidebar.multiselect(
-                "資料カテゴリ",
-                options=default_categories,
-                default=default_categories
-            )
+        # カテゴリ選択UI（常に表示）
+        sel_cat_short = st.sidebar.multiselect(
+            "資料カテゴリ",
+            options=default_categories,
+            default=default_categories
+        )
     else:
         # 制限なし
         sel_cat_short = st.sidebar.multiselect(
@@ -307,21 +283,11 @@ def build_sidebar(jichitai: pd.DataFrame, catmap: pd.DataFrame) -> dict:
     or_words = [w.strip() for w in or_input.replace("　", " ").split() if w.strip()]
     not_words = [w.strip() for w in not_input.replace("　", " ").split() if w.strip()]
     
-    # クエリ用の自治体コードプールを構築（フィルタ済みを使用）
-    code_pool = jichitai_filtered.copy()
-    if sel_city_types:
-        code_pool = code_pool[code_pool["city_type"].isin(sel_city_types)]
-    
-    # 都道府県全体が選択された場合の処理は上記で既に実施済み
-    
     # 市区町村が選択されている場合
     if sel_codes:
         codes_for_query = sel_codes
     else:
         codes_for_query = code_pool["code"].tolist()
-    
-    # # デバッグ: 最終的なクエリ用コード数を表示
-    # st.sidebar.write(f"🔍 クエリ対象: {len(codes_for_query)}自治体")
     
     return {
         "and_words": and_words,

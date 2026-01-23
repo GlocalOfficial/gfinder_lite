@@ -56,7 +56,8 @@ query = build_search_query(
     codes=sidebar_config["codes_for_query"],
     categories=sidebar_config["sel_categories"],
     search_fields=sidebar_config["search_fields"],
-    base_query=sidebar_config["restrictions"]["base_query"]  # ユーザーのベースクエリを渡す
+    base_query=sidebar_config["restrictions"]["base_query"],
+    can_modify_query=sidebar_config["restrictions"]["can_modify_query"]  # 追加
 )
 
 # ====== KPI取得 ======

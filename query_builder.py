@@ -1,6 +1,6 @@
 """
 クエリ構築モジュール
-Elasticsearchクエリの生成ロジック（ユーザー制限対応）
+Elasticsearchクエリの生成ロジック（ユーザー制限対応・キーワード統合改善版）
 """
 
 from typing import List, Optional
@@ -14,7 +14,8 @@ def build_search_query(
     codes: List[str],
     categories: List[int],
     search_fields: List[str] = None,
-    base_query: Optional[dict] = None
+    base_query: Optional[dict] = None,
+    can_modify_query: bool = True
 ) -> dict:
     """
     キーワード・年度・自治体・カテゴリを組み合わせたクエリを構築
@@ -28,6 +29,7 @@ def build_search_query(
         categories: カテゴリIDリスト
         search_fields: 検索対象フィールドリスト（["本文", "資料名"]）
         base_query: ベースクエリ（ユーザー制限用、user_query.pyから渡される）
+        can_modify_query: クエリ修正可能フラグ（Trueならベースクエリのキーワードを無視）
     
     Returns:
         dict: Elasticsearchクエリ
@@ -51,21 +53,53 @@ def build_search_query(
     must_not_clauses = []
     filter_clauses = []
     
-    # ===== ベースクエリがある場合は、そこから条件を引き継ぐ =====
+    # ===== ベースクエリの条件を分類して引き継ぐ =====
     if base_query and isinstance(base_query, dict):
         bool_base = base_query.get("bool", {})
         
-        # ベースクエリのmust句を引き継ぐ
+        # ベースクエリのmust句を分類
         if "must" in bool_base:
-            must_clauses.extend(bool_base["must"])
+            base_must = bool_base["must"]
+            if not isinstance(base_must, list):
+                base_must = [base_must]
+            
+            for clause in base_must:
+                # キーワード検索条件（match_phrase）かどうか判定
+                is_keyword = False
+                if "match_phrase" in clause:
+                    # 単一フィールドのmatch_phrase
+                    field_name = list(clause["match_phrase"].keys())[0]
+                    if field_name in ["content_text", "title"]:  # 検索対象フィールドかチェック
+                        is_keyword = True
+                elif "bool" in clause and "should" in clause["bool"]:
+                    # 複数フィールドのmatch_phrase（build_field_queryの形式）
+                    should_list = clause["bool"]["should"]
+                    if should_list and all("match_phrase" in s for s in should_list):
+                        is_keyword = True
+                
+                if is_keyword:
+                    # キーワード条件の扱い:
+                    # - can_modify_query=False: must_clausesに追加（UI入力と統合）
+                    # - can_modify_query=True: 無視（UI入力のみを使用）
+                    if not can_modify_query:
+                        must_clauses.append(clause)
+                else:
+                    # その他の条件（code, categoryなど）は常にfilter_clausesに追加
+                    filter_clauses.append(clause)
         
         # ベースクエリのshould句を引き継ぐ
         if "should" in bool_base:
-            should_clauses.extend(bool_base["should"])
+            base_should = bool_base["should"]
+            if not isinstance(base_should, list):
+                base_should = [base_should]
+            should_clauses.extend(base_should)
         
         # ベースクエリのmust_not句を引き継ぐ
         if "must_not" in bool_base:
-            must_not_clauses.extend(bool_base["must_not"])
+            base_must_not = bool_base["must_not"]
+            if not isinstance(base_must_not, list):
+                base_must_not = [base_must_not]
+            must_not_clauses.extend(base_must_not)
         
         # ベースクエリのfilter句を引き継ぐ
         if "filter" in bool_base:
@@ -87,15 +121,17 @@ def build_search_query(
                 }
             }
     
-    # ===== AND キーワード（追加条件） =====
+    # ===== AND キーワード（UI入力を追加） =====
+    # ベースクエリのキーワードは既にmust_clausesに含まれているので、
+    # UI入力分を追加
     for w in and_words:
         must_clauses.append(build_field_query(w))
     
-    # ===== OR キーワード（追加条件） =====
+    # ===== OR キーワード（UI入力を追加） =====
     for w in or_words:
         should_clauses.append(build_field_query(w))
     
-    # ===== NOT キーワード（追加条件） =====
+    # ===== NOT キーワード（UI入力を追加） =====
     for w in not_words:
         must_not_clauses.append(build_field_query(w))
     
@@ -134,15 +170,15 @@ def build_search_query(
         })
     
     # ===== 自治体コード（追加条件） =====
-    # ベースクエリで既に制限されている可能性があるので、
-    # codesが指定されている場合のみ追加
+    # UI入力で自治体が指定されている場合のみ追加
+    # （ベースクエリの自治体制限は既にfilter_clausesに含まれている）
     if codes:
-        # 既存のcode制限と重複しないように、新しいtermsクエリとして追加
-        # （ベースクエリのcode制限は既にmust_clausesに含まれている）
+        # ベースクエリに自治体制限がある場合は、AND条件として追加
+        # （より厳しい制限を適用）
         filter_clauses.append({"terms": {"code": codes}})
     
     # ===== カテゴリ（追加条件） =====
-    # 同様に、categoriesが指定されている場合のみ追加
+    # UI入力でカテゴリが指定されている場合のみ追加
     if categories:
         filter_clauses.append({"terms": {"category": categories}})
     
