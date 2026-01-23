@@ -1,5 +1,5 @@
 """
-AI要約タブの表示処理
+AI要約タブの表示処理（トークン数最適化版）
 """
 
 import datetime
@@ -48,21 +48,29 @@ def render_summary_tab(
         st.warning("要約する検索結果がありません。検索条件を設定してください。")
         return
     
-    st.info(f"📊 検索結果: {len(df_results)}件のドキュメント")
+    # ===== 🔧 文書数制限（方策2-B） =====
+    MAX_DOCS_FOR_SUMMARY = 1000  # 最大100件まで
+    
+    total_docs = len(df_results)
+    if total_docs > MAX_DOCS_FOR_SUMMARY:
+        st.warning(f"⚠️ 検索結果が{total_docs}件あります。トークン制限のため、上位{MAX_DOCS_FOR_SUMMARY}件のみを要約します。")
+        df_results = df_results.head(MAX_DOCS_FOR_SUMMARY)
+    
+    st.info(f"📊 要約対象: {len(df_results)}件のドキュメント")
     
     # モデル選択
     model_options = {
-        "GPT-4o": "gpt-4o",
+        # "GPT-4o": "gpt-4o",
         "GPT-4o mini": "gpt-4o-mini",
-        "GPT-4 Turbo": "gpt-4-turbo-preview",
-        "GPT-3.5 Turbo": "gpt-3.5-turbo"
+        # "GPT-4 Turbo": "gpt-4-turbo-preview",
+        # "GPT-3.5 Turbo": "gpt-3.5-turbo"
     }
     
     selected_model_name = st.selectbox(
         "使用するモデル",
         options=list(model_options.keys()),
         index=0,
-        help="GPT-4oが最新で高性能です。コストを抑えたい場合はGPT-4o miniまたはGPT-3.5 Turboを選択してください。"
+        help="GPT-4o miniで検証中です。"
     )
     selected_model = model_options[selected_model_name]
     
@@ -89,8 +97,30 @@ def render_summary_tab(
                 # OpenAIクライアントを取得
                 client = get_openai_client(openai_api_key)
                 
+                # ===== 🔧 トークン数削減: 必要な列だけを抽出 =====
+                essential_columns = [
+                    '都道府県', 
+                    '市区町村', 
+                    '資料カテゴリ', 
+                    '資料名', 
+                    '本文', 
+                    '開始年度', 
+                    '終了年度'
+                ]
+                
+                # 存在する列だけをフィルタリング
+                available_columns = [col for col in essential_columns if col in df_results.columns]
+                
+                # 必要な列だけを抽出してDataFrameを作成
+                df_essential = df_results[available_columns].copy()
+                
                 # DataFrameを辞書のリストに変換
-                documents = df_results.to_dict('records')
+                documents = df_essential.to_dict('records')
+                
+                # トークン削減情報を表示
+                # original_size = len(df_results.columns)
+                # optimized_size = len(available_columns)
+                # st.info(f"🔧 トークン最適化: {original_size}列 → {optimized_size}列に削減")
                 
                 # プロンプト生成
                 if summary_mode == "自動要約":
@@ -128,7 +158,7 @@ def render_summary_tab(
     with st.expander("ℹ️ AI要約の使用上の注意"):
         st.markdown("""
         - AIによる要約は参考情報です。重要な決定には必ず原文を確認してください
-        - 検索結果が多い場合、処理に時間がかかることがあります
+        - **文書数制限**: 検索結果が100件を超える場合、上位100件のみを要約します
         - 本文は最大2000文字まで使用されます
         - OpenAI APIの利用制限に応じて、一度に処理できる件数に制限があります
         - モデルによってコストが異なります：
@@ -136,4 +166,5 @@ def render_summary_tab(
           - **GPT-4o mini**: GPT-4oの軽量版（バランス型）
           - **GPT-4 Turbo**: 高性能（高コスト）
           - **GPT-3.5 Turbo**: 高速で低コスト
+        - **トークン最適化**: 不要な列（URL、ファイルIDなど）を送信から除外し、トークン数を削減しています
         """)
