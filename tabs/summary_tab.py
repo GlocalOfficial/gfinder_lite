@@ -1,5 +1,5 @@
 """
-AI要約タブの表示処理（バッチ処理+ストリーミング対応版・完全修正版）
+AI要約タブの表示処理（バッチ処理+ストリーミング対応版・エラー修正版）
 """
 
 import datetime
@@ -101,7 +101,6 @@ def render_summary_tab(
     estimated_total_cost = total_batches * estimated_cost_per_batch
     
     # 実行前の確認画面
-    show_confirmation = False
     if summary_mode == "カスタムプロンプト" and custom_instruction:
         with st.expander("⚠️ 実行内容の確認", expanded=True):
             st.markdown(f"""
@@ -122,7 +121,6 @@ def render_summary_tab(
             **ℹ️ 注意:**  
             バッチごとの分析のため、「最も〜」「TOP3」などの指示は最終統合時に適用されます
             """)
-        show_confirmation = True
     
     # 要約実行ボタン
     if st.button("🚀 要約を実行", type="primary", key="execute_summary_button"):
@@ -154,7 +152,6 @@ def render_summary_tab(
             df_essential = df_results[available_columns].copy()
             
             # ===== データをソート（まとまりのある分析のため） =====
-            # code, fiscal_year_start, file_idで並び替え
             sort_columns = []
             if '団体コード' in df_results.columns:
                 df_essential['団体コード'] = df_results['団体コード']
@@ -357,6 +354,35 @@ def render_summary_tab(
                         # 統合処理の進捗表示を消去
                         integration_placeholder.empty()
                         
+                        # ダウンロード用コンテンツを生成（セッションステート保存前に作成）
+                        download_content = f"""# {'カスタムプロンプト' if summary_mode == 'カスタムプロンプト' else '自動要約'}結果（完全版）
+
+## 基本情報
+- 実行日時: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+- 対象文書数: {total_docs}件
+- バッチ数: {len(batch_results)}
+- 処理時間: {(sum(processing_times) + integration_time) // 60:.0f}分{(sum(processing_times) + integration_time) % 60:.0f}秒
+
+## 最終統合結果
+
+{final_summary}
+
+---
+
+## 各バッチの詳細結果
+
+"""
+                        for i, result in enumerate(batch_results, 1):
+                            start_idx = (i - 1) * BATCH_SIZE + 1
+                            end_idx = min(i * BATCH_SIZE, total_docs)
+                            download_content += f"""### バッチ{i}（文書{start_idx}-{end_idx}件）
+
+{result}
+
+---
+
+"""
+                        
                         # セッションステートに結果を保存
                         st.session_state['summary_result'] = final_summary
                         st.session_state['summary_download_content'] = download_content
@@ -379,11 +405,38 @@ def render_summary_tab(
                             - 処理時間: {total_processing_time // 60:.0f}分{total_processing_time % 60:.0f}秒
                             """)
                         
-                        # ダウンロードボタンは別の場所に表示
-                        # （result_placeholderの外に出す）
+                        # ページをリロードして、セッションステートから結果を再表示
+                        st.rerun()
                     
                 except Exception as e:
                     integration_placeholder.empty()
+                    
+                    # エラー時のダウンロード用コンテンツを生成
+                    error_download_content = f"""# バッチ処理結果（統合失敗）
+
+## 基本情報
+- 実行日時: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+- 対象文書数: {total_docs}件
+- バッチ数: {len(batch_results)}
+- 処理時間: {sum(processing_times) // 60:.0f}分{sum(processing_times) % 60:.0f}秒
+
+## エラー情報
+{str(e)}
+
+## 各バッチの結果
+
+"""
+                    for i, result in enumerate(batch_results, 1):
+                        start_idx = (i - 1) * BATCH_SIZE + 1
+                        end_idx = min(i * BATCH_SIZE, total_docs)
+                        error_download_content += f"""### バッチ{i}（文書{start_idx}-{end_idx}件）
+
+{result}
+
+---
+
+"""
+                    
                     with result_placeholder.container():
                         st.error(f"⚠️ 最終統合処理でエラーが発生しました: {str(e)}")
                         
@@ -397,34 +450,12 @@ def render_summary_tab(
                         """)
                         
                         # エラー時もダウンロード機能を提供
-                        download_content = f"""# バッチ処理結果（統合失敗）
-
-## 基本情報
-- 実行日時: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-- 対象文書数: {total_docs}件
-- バッチ数: {len(batch_results)}
-- 処理時間: {sum(processing_times) // 60:.0f}分{sum(processing_times) % 60:.0f}秒
-
-## 各バッチの結果
-
-"""
-                        for i, result in enumerate(batch_results, 1):
-                            start_idx = (i - 1) * BATCH_SIZE + 1
-                            end_idx = min(i * BATCH_SIZE, total_docs)
-                            download_content += f"""### バッチ{i}（文書{start_idx}-{end_idx}件）
-
-{result}
-
----
-
-"""
-                        
                         st.download_button(
                             label="📥 バッチ結果をダウンロード",
-                            data=download_content,
-                            file_name=f"summary_batches_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                            data=error_download_content,
+                            file_name=f"summary_batches_error_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
                             mime="text/plain",
-                            key=f"download_error_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                            key=f"download_error_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
                         )
             
             elif not batch_results:
@@ -446,17 +477,18 @@ def render_summary_tab(
             st.session_state.stop_processing = False
     
     # ===== セッションステートから結果を復元して表示 =====
-    if 'summary_result' in st.session_state:
+    # ダウンロードボタンを押した後もこのセクションで結果が再表示される
+    if 'summary_result' in st.session_state and 'summary_mode' in st.session_state:
         st.markdown("---")
         st.markdown("# 🎯 最終統合結果")
         st.markdown(st.session_state['summary_result'])
         
         # 完了情報
         st.success(f"""
-        ✅ {st.session_state['summary_mode']}が完了しました
+        ✅ {st.session_state.get('summary_mode', '要約')}が完了しました
         
-        - 処理済み: {st.session_state['summary_total_docs']}件（{st.session_state['summary_batch_count']}バッチ + 統合1回）
-        - 処理時間: {st.session_state['summary_processing_time'] // 60:.0f}分{st.session_state['summary_processing_time'] % 60:.0f}秒
+        - 処理済み: {st.session_state.get('summary_total_docs', 0)}件（{st.session_state.get('summary_batch_count', 0)}バッチ + 統合1回）
+        - 処理時間: {st.session_state.get('summary_processing_time', 0) // 60:.0f}分{st.session_state.get('summary_processing_time', 0) % 60:.0f}秒
         """)
         
         # ダウンロードボタン
@@ -464,7 +496,7 @@ def render_summary_tab(
         with col1:
             st.download_button(
                 label="📥 完全版をダウンロード",
-                data=st.session_state['summary_download_content'],
+                data=st.session_state.get('summary_download_content', ''),
                 file_name=f"summary_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
                 mime="text/plain",
                 key="download_full_persistent"
@@ -472,7 +504,7 @@ def render_summary_tab(
         with col2:
             st.download_button(
                 label="📊 統合結果のみダウンロード",
-                data=st.session_state['summary_result'],
+                data=st.session_state.get('summary_result', ''),
                 file_name=f"summary_final_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
                 mime="text/plain",
                 key="download_final_persistent"
@@ -490,4 +522,5 @@ def render_summary_tab(
         - エラー時は自動リトライを行います（最大3回）
         - **トークン最適化**: 不要な列を送信から除外し、トークン数を削減しています
         - **表示**: 統合結果のみ表示されます。各バッチの詳細は完全版ダウンロードで確認できます
+        - **ダウンロード後も結果表示**: ダウンロードボタンを押しても結果は消えません
         """)

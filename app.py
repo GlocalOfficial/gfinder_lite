@@ -9,7 +9,7 @@ import streamlit as st
 from auth import check_password
 
 # ページ設定(認証前に実行)
-st.set_page_config(page_title="G-Finder データ収録状況", layout="wide")
+st.set_page_config(page_title="G-Finder Lite⚡", layout="wide")
 st.markdown("""
 <style>
   [data-testid="stSidebar"] {width: 360px;}
