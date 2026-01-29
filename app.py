@@ -78,45 +78,64 @@ show_search_info(
 # ====== KPI表示 ======
 show_kpi_metrics(kpi_data)
 
-# ====== タブ表示 ======
-tab_results, tab_counts, tab_latest, tab_summary = st.tabs([
-    "検索結果", "件数", "最新収集月", "🤖 AI要約(準備中)"
-])
-
-with tab_results:
-    render_results_tab(
+# ====== タブ表示（権限で動的に制御） ======
+# ユーザー権限に基づいてタブを動的に構築
+tab_names = ["検索結果"]
+tab_functions = [
+    lambda: render_results_tab(
         es=es,
         query=query,
         jichitai=jichitai,
         catmap=catmap,
         result_limit=sidebar_config["result_limit"]
     )
+]
 
-with tab_counts:
-    render_counts_tab(
-        es=es,
-        query=query,
-        jichitai=jichitai,
-        pref_master=pref_master,
-        catmap=catmap,
-        short_unique=sidebar_config["short_unique"]
+# 件数タブ（権限がある場合のみ）
+if st.session_state.get("user_can_show_count", True):
+    tab_names.append("件数")
+    tab_functions.append(
+        lambda: render_counts_tab(
+            es=es,
+            query=query,
+            jichitai=jichitai,
+            pref_master=pref_master,
+            catmap=catmap,
+            short_unique=sidebar_config["short_unique"]
+        )
     )
 
-with tab_latest:
-    render_latest_tab(
-        es=es,
-        query=query,
-        jichitai=jichitai,
-        pref_master=pref_master,
-        catmap=catmap,
-        short_unique=sidebar_config["short_unique"]
+# 最新収集月タブ（権限がある場合のみ）
+if st.session_state.get("user_can_show_latest", True):
+    tab_names.append("最新収集月")
+    tab_functions.append(
+        lambda: render_latest_tab(
+            es=es,
+            query=query,
+            jichitai=jichitai,
+            pref_master=pref_master,
+            catmap=catmap,
+            short_unique=sidebar_config["short_unique"]
+        )
     )
 
-with tab_summary:
-    render_summary_tab(
-        es=es,
-        query=query,
-        jichitai=jichitai,
-        catmap=catmap,
-        result_limit=sidebar_config["result_limit"]
+# AI要約タブ（権限がある場合のみ）
+if st.session_state.get("user_can_show_summary", True):
+    tab_names.append("🤖 AI要約")
+    tab_functions.append(
+        lambda: render_summary_tab(
+            es=es,
+            query=query,
+            jichitai=jichitai,
+            catmap=catmap,
+            result_limit=sidebar_config["result_limit"]
+        )
     )
+
+# タブを作成
+tabs = st.tabs(tab_names)
+
+# 各タブの内容をレンダリング
+for tab, render_func in zip(tabs, tab_functions):
+    with tab:
+        render_func()

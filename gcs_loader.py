@@ -96,7 +96,11 @@ def load_auth_from_gcs() -> Optional[pd.DataFrame]:
         df = pd.read_excel(io.BytesIO(content))
         
         # 必須列のチェック
-        required_cols = ["username", "password", "display_name", "query_file", "can_modify_query", "enabled"]
+        required_cols = [
+            "username", "password", "display_name", "query_file", 
+            "can_modify_query", "enabled",
+            "can_show_count", "can_show_latest", "can_show_summary"
+        ]
         missing_cols = [col for col in required_cols if col not in df.columns]
         
         if missing_cols:
@@ -112,6 +116,11 @@ def load_auth_from_gcs() -> Optional[pd.DataFrame]:
             return str(val).upper() in ['TRUE', '1', 'YES']
         
         df["can_modify_query"] = df["can_modify_query"].apply(parse_bool)
+        
+        # タブ表示権限の処理（空欄の場合はNoneのまま保持）
+        df["can_show_count"] = df["can_show_count"].apply(parse_bool)
+        df["can_show_latest"] = df["can_show_latest"].apply(parse_bool)
+        df["can_show_summary"] = df["can_show_summary"].apply(parse_bool)
         
         # enabledの処理（デフォルトはTrue）
         df["enabled"] = df["enabled"].apply(lambda x: parse_bool(x) if parse_bool(x) is not None else True)

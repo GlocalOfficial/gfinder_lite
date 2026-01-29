@@ -91,6 +91,17 @@ def _auth_with_user_db(auth_df) -> bool:
                 else:
                     st.session_state["user_can_modify_query"] = bool(can_modify_value)
                 
+                # タブ表示権限の処理（空欄の場合はTrueとして扱う：デフォルト表示）
+                def parse_tab_permission(value):
+                    """タブ権限を安全にパース（空欄はTrueのまま返す）"""
+                    if value is None or str(value).strip() == '' or str(value).lower() == 'nan':
+                        return True
+                    return str(value).upper() in ['TRUE', '1', 'YES']
+                
+                st.session_state["user_can_show_count"] = parse_tab_permission(user_info.get("can_show_count"))
+                st.session_state["user_can_show_latest"] = parse_tab_permission(user_info.get("can_show_latest"))
+                st.session_state["user_can_show_summary"] = parse_tab_permission(user_info.get("can_show_summary"))
+                
                 st.success(f"ようこそ、{user_info['display_name']}さん")
                 st.rerun()
             else:
@@ -128,6 +139,10 @@ def _auth_with_simple_password() -> bool:
                 st.session_state["user_display_name"] = "ゲスト"
                 st.session_state["user_query_file"] = None
                 st.session_state["user_can_modify_query"] = True
+                # 簡易認証の場合は全タブ表示
+                st.session_state["user_can_show_count"] = True
+                st.session_state["user_can_show_latest"] = True
+                st.session_state["user_can_show_summary"] = True
                 st.rerun()
             else:
                 st.error("パスワードが違います。")

@@ -1,5 +1,5 @@
 """
-件数タブの表示処理
+件数タブの表示処理（0件の自治体も表示）
 """
 
 import streamlit as st
@@ -20,7 +20,7 @@ def render_counts_tab(
     short_unique: pd.DataFrame
 ):
     """
-    件数タブの表示
+    件数タブの表示（0件の自治体も含めて表示）
     
     Args:
         es: Elasticsearchクライアント
@@ -55,7 +55,7 @@ def render_counts_tab(
     
     st.markdown("---")
     
-    # データ取得と表示
+    # データ取得
     group_field = FIELD_CODE if display_unit == "市区町村" else FIELD_AFFILIATION
     df_counts = fetch_counts(
         es,
@@ -64,16 +64,16 @@ def render_counts_tab(
         include_file=("ファイル数" in count_mode)
     )
     
-    if df_counts.empty:
-        st.warning("該当データがありません。フィルタを見直してください。")
-    else:
-        table = build_counts_table(
-            df_counts,
-            jichitai,
-            pref_master,
-            catmap,
-            display_unit,
-            count_mode,
-            short_unique
-        )
-        show_df(table)
+    # 0件の自治体も含めたテーブルを構築
+    table = build_counts_table(
+        df_counts,
+        jichitai,
+        pref_master,
+        catmap,
+        display_unit,
+        count_mode,
+        short_unique,
+        include_zero=True  # 0件も表示
+    )
+    
+    show_df(table)
