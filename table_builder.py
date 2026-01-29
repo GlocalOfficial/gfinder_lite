@@ -66,6 +66,11 @@ def build_counts_table(
         pd.DataFrame: ピボットテーブル
     """
     df = df.copy()
+    
+    # category列が存在しない場合の処理
+    if "category" not in df.columns:
+        df["category"] = 0
+    
     df["short_name"] = df["category"].map(cat_short_map(catmap)).fillna(df["category"].astype(str))
     value_col = "file_docs" if ("ファイル数" in count_mode) else "page_docs"
     
