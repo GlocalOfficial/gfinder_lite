@@ -267,25 +267,6 @@ username         | password   | display_name | query_file          | can_modify_
 former_user      | (任意)     | 前任者       | (任意)               | (任意)           | (任意)         | (任意)          | (任意)           | FALSE
 ```
 → ログイン試行時に「アカウントが無効です」エラーが表示される。その他の設定値は参照されない。
-user_osaka       | osaka_pw   | 大阪府職員   | user_osaka.json     | TRUE             | TRUE
-```
-→ `user_osaka.json` で定義された大阪府がベース。キーワード検索での絞り込みは可能。
-
-**パターン4: ゲストユーザー（期間限定）**
-```
-username         | password   | display_name | query_file          | can_modify_query | enabled
------------------|-----------|--------------|---------------------|------------------|--------
-guest_user       | guest_pw   | 外部コンサル | guest.json          | FALSE            | TRUE
-```
-→ 限定的なデータのみアクセス可能。検索条件は固定。
-
-**パターン5: 無効ユーザー（ログイン不可）**
-```
-username         | password   | display_name | query_file          | can_modify_query | enabled
------------------|-----------|--------------|---------------------|------------------|--------
-former_user      | (任意)     | 前任者       | (任意)               | (任意)           | FALSE
-```
-→ ログイン試行時に「アカウントが無効です」エラーが表示される。
 
 #### セッション状態への反映
 
@@ -298,8 +279,42 @@ st.session_state["username"] = "user_tokyo"              # auth.xlsx の usernam
 st.session_state["user_display_name"] = "東京都ユーザー"  # auth.xlsx の display_name
 st.session_state["user_query_file"] = "user_tokyo.json"  # auth.xlsx の query_file
 st.session_state["user_can_modify_query"] = False        # auth.xlsx の can_modify_query
+st.session_state["user_can_show_count"] = True           # auth.xlsx の can_show_count
+st.session_state["user_can_show_latest"] = True          # auth.xlsx の can_show_latest
+st.session_state["user_can_show_summary"] = False        # auth.xlsx の can_show_summary
 st.session_state["user_base_query"] = {...}              # GCS から取得したJSON
 ```
+
+#### タブ表示制御
+
+各タブの表示/非表示は、セッション状態の値に基づいて動的に制御されます：
+
+**app.py（タブ表示ロジック例）:**
+```python
+# タブの動的構築
+tabs_to_show = ["results_tab"]  # 検索結果は常に表示
+
+# ユーザー権限に基づいてタブを追加
+if st.session_state.get("user_can_show_count", True):
+    tabs_to_show.append("counts_tab")           # 件数タブを追加
+
+if st.session_state.get("user_can_show_latest", True):
+    tabs_to_show.append("latest_tab")           # 最新収集月タブを追加
+
+if st.session_state.get("user_can_show_summary", False):
+    tabs_to_show.append("summary_tab")          # AI要約タブを追加
+
+# 動的にタブを生成
+tabs = st.tabs(tabs_to_show)
+```
+
+**結果例:**
+- `can_show_count=TRUE, can_show_latest=TRUE, can_show_summary=FALSE`
+  → 表示タブ: 「検索結果」「件数」「最新収集月」
+- `can_show_count=FALSE, can_show_latest=FALSE, can_show_summary=TRUE`
+  → 表示タブ: 「検索結果」「AI要約」
+- `can_show_count=FALSE, can_show_latest=FALSE, can_show_summary=FALSE`
+  → 表示タブ: 「検索結果」のみ
 
 #### user_query.py での利用
 
