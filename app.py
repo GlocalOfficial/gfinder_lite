@@ -101,7 +101,10 @@ if st.session_state.get("user_can_show_count", True):
             jichitai=jichitai,
             pref_master=pref_master,
             catmap=catmap,
-            short_unique=sidebar_config["short_unique"]
+            short_unique=sidebar_config["short_unique"],
+            filtered_codes=sidebar_config["filtered_codes"],  # UIで選択された自治体
+            restricted_codes=sidebar_config["restrictions"]["allowed_codes"],  # ベースクエリの制限
+            selected_city_types=sidebar_config["selected_city_types"]  # UIで選択された自治体区分
         )
     )
 
@@ -115,7 +118,10 @@ if st.session_state.get("user_can_show_latest", True):
             jichitai=jichitai,
             pref_master=pref_master,
             catmap=catmap,
-            short_unique=sidebar_config["short_unique"]
+            short_unique=sidebar_config["short_unique"],
+            filtered_codes=sidebar_config["filtered_codes"],  # UIで選択された自治体
+            restricted_codes=sidebar_config["restrictions"]["allowed_codes"],  # ベースクエリの制限
+            selected_city_types=sidebar_config["selected_city_types"]  # UIで選択された自治体区分
         )
     )
 

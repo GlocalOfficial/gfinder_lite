@@ -1,5 +1,5 @@
 """
-件数タブの表示処理（0件の自治体も表示）
+件数タブの表示処理（自治体表示の優先順位対応）
 """
 
 import streamlit as st
@@ -17,10 +17,18 @@ def render_counts_tab(
     jichitai: pd.DataFrame,
     pref_master: pd.DataFrame,
     catmap: pd.DataFrame,
-    short_unique: pd.DataFrame
+    short_unique: pd.DataFrame,
+    filtered_codes: list = None,
+    restricted_codes: list = None,
+    selected_city_types: list = None
 ):
     """
-    件数タブの表示（0件の自治体も含めて表示）
+    件数タブの表示（自治体表示の優先順位対応）
+    
+    優先順位:
+    1. filtered_codes（UIで選択）が指定された場合、その自治体のみ表示（0件含む）
+    2. filtered_codesが空でも、restricted_codes（ベースクエリ）がある場合、その自治体のみ表示
+    3. どちらも該当しない場合は全自治体を表示
     
     Args:
         es: Elasticsearchクライアント
@@ -29,6 +37,9 @@ def render_counts_tab(
         pref_master: 都道府県マスターデータ
         catmap: カテゴリマスターデータ
         short_unique: ユニークなshort_nameリスト
+        filtered_codes: UIで選択された自治体コード（サイドバーから渡される）
+        restricted_codes: ベースクエリで制限された自治体コード（ユーザー制限）
+        selected_city_types: 選択された自治体区分（サイドバーから渡される）
     """
     # 表示設定（タブ内）
     st.markdown("### ⚙️ 表示設定")
@@ -55,6 +66,16 @@ def render_counts_tab(
     
     st.markdown("---")
     
+    # 表示する自治体の決定（優先順位適用）
+    display_codes = None  # None = 全自治体表示
+    
+    if filtered_codes:
+        # 優先順位1: UIで自治体が選択されている場合
+        display_codes = filtered_codes
+    elif restricted_codes:
+        # 優先順位2: ベースクエリで制限がある場合
+        display_codes = restricted_codes
+    
     # データ取得
     group_field = FIELD_CODE if display_unit == "市区町村" else FIELD_AFFILIATION
     df_counts = fetch_counts(
@@ -64,10 +85,20 @@ def render_counts_tab(
         include_file=("ファイル数" in count_mode)
     )
     
+    # 表示する自治体でjichitaiをフィルタリング
+    if display_codes:
+        jichitai_filtered = jichitai[jichitai["code"].isin(display_codes)].copy()
+    else:
+        jichitai_filtered = jichitai.copy()
+    
+    # 自治体区分でさらにフィルタリング
+    if selected_city_types:
+        jichitai_filtered = jichitai_filtered[jichitai_filtered["city_type"].isin(selected_city_types)].copy()
+    
     # 0件の自治体も含めたテーブルを構築
     table = build_counts_table(
         df_counts,
-        jichitai,
+        jichitai_filtered,  # フィルタ済みのjichitaiを渡す
         pref_master,
         catmap,
         display_unit,

@@ -301,4 +301,6 @@ def build_sidebar(jichitai: pd.DataFrame, catmap: pd.DataFrame) -> dict:
         "result_limit": result_limit,
         "short_unique": short_unique,
         "restrictions": restrictions,  # ユーザー制限情報を追加
+        "filtered_codes": sel_codes,  # UIで選択された自治体コード（空=未選択）
+        "selected_city_types": sel_city_types,  # UIで選択された自治体区分
     }
