@@ -274,8 +274,8 @@ def build_sidebar(jichitai: pd.DataFrame, catmap: pd.DataFrame) -> dict:
     result_limit = st.sidebar.radio(
         "検索結果の表示件数",
         options=[100, 1000, 10000],
-        index=0,
-        help="検索結果タブでの表示件数を変更できます\n(デフォルト100件 多くなると挙動が重くなる可能性があります)"
+        index=1,
+        help="検索結果タブでの表示件数を変更できます\n(デフォルト1000件 多くなると挙動が重くなる可能性があります)"
     )
     
     # キーワード処理
