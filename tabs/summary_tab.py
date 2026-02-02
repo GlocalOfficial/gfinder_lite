@@ -9,7 +9,7 @@ import pandas as pd
 from elasticsearch import Elasticsearch
 from config import get_secret
 from data_fetcher import fetch_search_results
-from openai_helper import get_openai_client, generate_summary
+from openai_helper import get_openai_client, generate_summary, get_user_openai_api_key
 from prompt import get_summary_prompt, get_custom_prompt, get_custom_batch_prompt, get_custom_integration_prompt
 
 
@@ -38,10 +38,10 @@ def render_summary_tab(
     """
     st.subheader("🤖 GPT による要約")
     
-    # APIキーの確認
-    openai_api_key = get_secret("OPENAI_API_KEY")
+    # APIキーの確認（ユーザー個別→デフォルトの優先順位）
+    openai_api_key = get_user_openai_api_key()
     if not openai_api_key:
-        st.error("OpenAI APIキーが設定されていません。Streamlit Secretsに `OPENAI_API_KEY` を追加してください。")
+        st.error("OpenAI APIキーが設定されていません。ユーザー管理者に問い合わせるか、Streamlit Secretsに `OPENAI_API_KEY` を追加してください。")
         return
     
     # 検索結果の確認

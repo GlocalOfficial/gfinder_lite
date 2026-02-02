@@ -99,7 +99,8 @@ def load_auth_from_gcs() -> Optional[pd.DataFrame]:
         required_cols = [
             "username", "password", "display_name", "query_file", 
             "can_modify_query", "enabled",
-            "can_show_count", "can_show_latest", "can_show_summary"
+            "can_show_count", "can_show_latest", "can_show_summary",
+            "openai_api_key"
         ]
         missing_cols = [col for col in required_cols if col not in df.columns]
         
@@ -115,6 +116,12 @@ def load_auth_from_gcs() -> Optional[pd.DataFrame]:
                 return None
             return str(val).upper() in ['TRUE', '1', 'YES']
         
+        def parse_api_key(val):
+            """APIキーを安全にパース（空欄はNoneに変換）"""
+            if pd.isna(val) or val == '' or str(val).strip() == '' or str(val).lower() == 'nan':
+                return None
+            return str(val).strip()
+        
         df["can_modify_query"] = df["can_modify_query"].apply(parse_bool)
         
         # タブ表示権限の処理（空欄の場合はNoneのまま保持）
@@ -129,6 +136,9 @@ def load_auth_from_gcs() -> Optional[pd.DataFrame]:
         df["query_file"] = df["query_file"].apply(
             lambda x: str(x).strip() if pd.notna(x) and str(x).strip() and str(x).lower() != 'nan' else None
         )
+        
+        # openai_api_keyの処理（空欄はNoneに変換）
+        df["openai_api_key"] = df["openai_api_key"].apply(parse_api_key)
         
         return df
     

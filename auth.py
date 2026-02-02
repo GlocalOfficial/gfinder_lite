@@ -84,6 +84,13 @@ def _auth_with_user_db(auth_df) -> bool:
                 else:
                     st.session_state["user_query_file"] = None
                 
+                # openai_api_keyの処理（空欄の場合はNoneを設定）
+                openai_api_key_value = user_info.get("openai_api_key")
+                if openai_api_key_value and str(openai_api_key_value).strip() and str(openai_api_key_value).lower() != 'nan':
+                    st.session_state["user_openai_api_key"] = str(openai_api_key_value).strip()
+                else:
+                    st.session_state["user_openai_api_key"] = None
+                
                 # can_modify_queryが空欄の場合はTrueとして扱う（デフォルト：制限なし）
                 can_modify_value = user_info["can_modify_query"]
                 if can_modify_value is None or str(can_modify_value).strip() == '' or str(can_modify_value).lower() == 'nan':
@@ -138,6 +145,7 @@ def _auth_with_simple_password() -> bool:
                 st.session_state["_authed"] = True
                 st.session_state["user_display_name"] = "ゲスト"
                 st.session_state["user_query_file"] = None
+                st.session_state["user_openai_api_key"] = None  # 簡易認証の場合はNone
                 st.session_state["user_can_modify_query"] = True
                 # 簡易認証の場合は全タブ表示
                 st.session_state["user_can_show_count"] = True

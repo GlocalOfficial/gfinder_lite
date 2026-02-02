@@ -5,6 +5,7 @@ OpenAI API連携用のヘルパー関数
 from openai import OpenAI
 from typing import Optional
 import streamlit as st
+from config import get_secret
 
 
 def init_openai(api_key: str) -> OpenAI:
@@ -18,6 +19,30 @@ def init_openai(api_key: str) -> OpenAI:
         OpenAI: 初期化されたOpenAIクライアント
     """
     return OpenAI(api_key=api_key)
+
+
+def get_user_openai_api_key() -> Optional[str]:
+    """
+    ユーザーのOpenAI APIキーを取得
+    優先順位：
+    1. ユーザー個別のAPIキー（auth.xlsx）
+    2. secrets.tomlのOPENAI_API_KEY
+    3. None
+    
+    Returns:
+        Optional[str]: OpenAI APIキー、未設定時はNone
+    """
+    # ユーザー個別のAPIキーを確認
+    user_api_key = st.session_state.get("user_openai_api_key")
+    if user_api_key:
+        return user_api_key
+    
+    # フォールバック：secrets.tomlから取得
+    default_api_key = get_secret("OPENAI_API_KEY")
+    if default_api_key:
+        return default_api_key
+    
+    return None
 
 
 def generate_summary(client: OpenAI, prompt: str, model: str = "gpt-4o") -> Optional[str]:

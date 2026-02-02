@@ -149,16 +149,17 @@ category | category_name      | short_name   | order | group
 | `can_show_count` | 文字列 | 「件数」タブ表示可否（`TRUE`/`FALSE`） | `TRUE` |
 | `can_show_latest` | 文字列 | 「最新収集月」タブ表示可否（`TRUE`/`FALSE`） | `TRUE` |
 | `can_show_summary` | 文字列 | 「AI要約」タブ表示可否（`TRUE`/`FALSE`） | `FALSE` |
+| `openai_api_key` | 文字列 | ユーザー個別のOpenAI APIキー（オプション） | `sk-proj-xxxxx...` |
 | `enabled` | 文字列 | アカウント有効/無効（`TRUE`/`FALSE`） | `TRUE` |
 
 **サンプル（auth.xlsx）:**
 ```
-username    | password | display_name      | query_file        | can_modify_query | can_show_count | can_show_latest | can_show_summary | enabled
-------------|----------|-------------------|-------------------|------------------|----------------|-----------------|------------------|--------
-admin       | admin123 | 管理者            |                   | TRUE             | TRUE           | TRUE            | TRUE             | TRUE
-user_tokyo  | tokyo456 | 東京都ユーザー    | user_tokyo.json   | FALSE            | TRUE           | TRUE            | FALSE            | TRUE
-user_osaka  | osaka789 | 大阪府ユーザー    | user_osaka.json   | TRUE             | TRUE           | FALSE           | TRUE             | TRUE
-guest       | guest000 | ゲストユーザー    | guest.json        | FALSE            | FALSE          | FALSE           | FALSE            | FALSE
+username    | password | display_name      | query_file        | can_modify_query | can_show_count | can_show_latest | can_show_summary | openai_api_key | enabled
+------------|----------|-------------------|-------------------|------------------|----------------|-----------------|------------------|-------|--------
+admin       | admin123 | 管理者            |                   | TRUE             | TRUE           | TRUE            | TRUE             |       | TRUE
+user_tokyo  | tokyo456 | 東京都ユーザー    | user_tokyo.json   | FALSE            | TRUE           | TRUE            | FALSE            | sk-proj-xxxxA  | TRUE
+user_osaka  | osaka789 | 大阪府ユーザー    | user_osaka.json   | TRUE             | TRUE           | FALSE           | TRUE             | sk-proj-xxxxB  | TRUE
+guest       | guest000 | ゲストユーザー    | guest.json        | FALSE            | FALSE          | FALSE           | FALSE            |       | FALSE
 ```
 
 **GCS保存場所:**
@@ -169,11 +170,15 @@ gs://{your-bucket-name}/auth.xlsx
 **列の詳細説明:**
 
 - **username**: ログイン時に使用するユーザーID（一意である必要があります）
-- **password**: 平文パスワード（⚠️ 本番環境ではハッシュ化を推奨）
+- **password**: 平文パスワード
 - **display_name**: アプリ内で表示されるユーザー名
 - **query_file**: 
   - 空欄: 制限なし（全データアクセス可能）
   - ファイル名指定: GCS上の`query/`ディレクトリ内のJSONファイルを参照（例: `user_tokyo.json`）
+- **openai_api_key**:
+  - 個別のOpenAI APIキーを指定可能
+  - 空欄の場合: `secrets.toml`の`OPENAI_API_KEY`を使用（フォールバック）
+  - ユーザーごとに異なるAPIキーを使用することで、API使用量の追跡や課金の分離が可能
 - **can_modify_query**:
   - `TRUE`: ベースクエリに追加してキーワード検索等が可能
   - `FALSE`: クエリ固定モード（検索条件変更不可）
@@ -282,6 +287,7 @@ st.session_state["user_can_modify_query"] = False        # auth.xlsx の can_mod
 st.session_state["user_can_show_count"] = True           # auth.xlsx の can_show_count
 st.session_state["user_can_show_latest"] = True          # auth.xlsx の can_show_latest
 st.session_state["user_can_show_summary"] = False        # auth.xlsx の can_show_summary
+st.session_state["user_openai_api_key"] = "sk-proj-xxxxx"  # auth.xlsx の openai_api_key（空欄の場合はNone）
 st.session_state["user_base_query"] = {...}              # GCS から取得したJSON
 ```
 
