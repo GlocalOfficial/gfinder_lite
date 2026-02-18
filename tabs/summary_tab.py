@@ -145,7 +145,9 @@ def render_summary_tab(
                 '資料名', 
                 '本文', 
                 '開始年度', 
-                '終了年度'
+                '終了年度',
+                'URL(原本)',
+                'URL(GF)'
             ]
             
             available_columns = [col for col in essential_columns if col in df_results.columns]
